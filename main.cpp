@@ -37,6 +37,22 @@ auto report_desc = gamepad(
 	report_size(8),
 	input(0x02),
 	
+	usage_page(UsagePage::Desktop),
+	usage(DesktopUsage::Rx),
+	logical_minimum(-127),
+	logical_maximum(127),
+	report_count(1),
+	report_size(8),
+	input(0x06),
+
+	usage_page(UsagePage::Desktop),
+	usage(DesktopUsage::Ry),
+	logical_minimum(-127),
+	logical_maximum(127),
+	report_count(1),
+	report_size(8),
+	input(0x06),
+	
 	// Outputs.
 	usage_page(UsagePage::Ordinal),
 	usage(1),
@@ -297,6 +313,8 @@ struct report_t {
 	uint16_t buttons;
 	uint8_t axis_x;
 	uint8_t axis_y;
+	int8_t axis_rx;
+	int8_t axis_ry;
 } __attribute__((packed));
 
 int main() {
@@ -356,6 +374,9 @@ int main() {
 	qe2a.set_mode(Pin::AF);
 	qe2b.set_mode(Pin::AF);
 	
+	uint8_t last_x = 0;
+	uint8_t last_y = 0;
+	
 	while(1) {
 		usb.process();
 		
@@ -371,7 +392,14 @@ int main() {
 		}
 		
 		if(usb.ep_ready(1)) {
-			report_t report = {buttons, uint8_t(TIM2.CNT), uint8_t(TIM3.CNT)};
+			uint8_t x = TIM2.CNT;
+			uint8_t y = TIM3.CNT;
+			int8_t rx = x - last_x;
+			int8_t ry = y - last_y;
+			last_x = x;
+			last_y = y;
+			
+			report_t report = {buttons, x, y, rx, ry};
 			
 			usb.write(1, (uint32_t*)&report, sizeof(report));
 		}
