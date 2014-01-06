@@ -18,8 +18,8 @@ void reset_bootloader() {
 
 auto report_desc = gamepad(
 	// Inputs.
-	buttons(11),
-	padding_in(5),
+	buttons(15),
+	padding_in(1),
 	
 	usage_page(UsagePage::Desktop),
 	usage(DesktopUsage::X),
@@ -36,22 +36,6 @@ auto report_desc = gamepad(
 	report_count(1),
 	report_size(8),
 	input(0x02),
-	
-	usage_page(UsagePage::Desktop),
-	usage(DesktopUsage::Rx),
-	logical_minimum(-127),
-	logical_maximum(127),
-	report_count(1),
-	report_size(8),
-	input(0x06),
-
-	usage_page(UsagePage::Desktop),
-	usage(DesktopUsage::Ry),
-	logical_minimum(-127),
-	logical_maximum(127),
-	report_count(1),
-	report_size(8),
-	input(0x06),
 	
 	// Outputs.
 	usage_page(UsagePage::Ordinal),
@@ -313,8 +297,6 @@ struct report_t {
 	uint16_t buttons;
 	uint8_t axis_x;
 	uint8_t axis_y;
-	int8_t axis_rx;
-	int8_t axis_ry;
 } __attribute__((packed));
 
 int main() {
@@ -377,6 +359,9 @@ int main() {
 	uint8_t last_x = 0;
 	uint8_t last_y = 0;
 	
+	int8_t state_x = 0;
+	int8_t state_y = 0;
+	
 	while(1) {
 		usb.process();
 		
@@ -399,7 +384,39 @@ int main() {
 			last_x = x;
 			last_y = y;
 			
-			report_t report = {buttons, x, y, rx, ry};
+			if(rx > 0) {
+				state_x = 100;
+			} else if(rx < 0) {
+				state_x = -100;
+			} else if(state_x > 0) {
+				state_x--;
+			} else if(state_x < 0) {
+				state_x++;
+			}
+			
+			if(ry > 0) {
+				state_y = 100;
+			} else if(ry < 0) {
+				state_y = -100;
+			} else if(state_y > 0) {
+				state_y--;
+			} else if(state_y < 0) {
+				state_y++;
+			}
+			
+			if(state_x > 0) {
+				buttons |= 1 << 11;
+			} else if(state_x < 0) {
+				buttons |= 1 << 12;
+			}
+			
+			if(state_y > 0) {
+				buttons |= 1 << 13;
+			} else if(state_y < 0) {
+				buttons |= 1 << 14;
+			}
+			
+			report_t report = {buttons, x, y};
 			
 			usb.write(1, (uint32_t*)&report, sizeof(report));
 		}
