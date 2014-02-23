@@ -3,6 +3,7 @@
 #include <interrupt/interrupt.h>
 #include <timer/timer.h>
 #include <os/time.h>
+#include <spi/spi.h>
 #include <usb/usb.h>
 #include <usb/descriptor.h>
 #include <usb/hid.h>
@@ -188,6 +189,145 @@ static Pin qe2b = GPIOA[7];
 static Pin led1 = GPIOA[8];
 static Pin led2 = GPIOA[9];
 
+static Pin spi_ack = GPIOB[11];
+static Pin spi_nss = GPIOB[12];
+static Pin spi_sck = GPIOB[13];
+static Pin spi_miso = GPIOB[14];
+static Pin spi_mosi = GPIOB[15];
+
+RBLog<256, 2> ps_rblog; 
+
+class SPI_PS {
+	private:
+		uint32_t last_byte_time;
+		
+		int32_t pos;
+		
+		uint32_t state;
+		
+		bool received_byte(uint8_t data) {
+			if(Time::time() - last_byte_time > 2) {
+				pos = 0; // Assume start of new command.
+			}
+			
+			last_byte_time = Time::time();
+			
+			if(pos == -1) {
+				return false;
+			}
+			
+			ps_rblog.log("pos = %d", pos);
+			
+			if(pos == 0 && data != 0x01) {
+				pos = -1;
+				return false;
+			}
+			
+			if(pos == 1 && data != 0x42) {
+				pos = -1;
+				return false;
+			}
+			
+			if(pos > 4) {
+				pos = -1;
+				return false;
+			}
+			
+			switch(pos) {
+				case 0:
+					SPI2.reg.DR8 = 0x41;
+					break;
+				
+				case 1:
+					SPI2.reg.DR8 = 0x5a;
+					break;
+				
+				case 2:
+					SPI2.reg.DR8 = state & 0xff;
+					break;
+				
+				case 3:
+					SPI2.reg.DR8 = (state >> 8) & 0xff;
+					break;
+				
+				case 4:
+					//SPI2.reg.DR8 = 0xff;
+					break;
+			}
+			
+			pos++;
+			
+			return true;
+		}
+	
+	public:
+		void init() {
+			RCC.enable(RCC.SPI2);
+			
+			spi_ack.on();
+			spi_ack.set_type(Pin::OpenDrain);
+			spi_ack.set_mode(Pin::Output);
+			
+			spi_nss.set_af(5);
+			spi_nss.set_type(Pin::OpenDrain);
+			spi_nss.set_mode(Pin::AF);
+			
+			spi_sck.set_af(5);
+			spi_sck.set_type(Pin::OpenDrain);
+			spi_sck.set_mode(Pin::AF);
+			
+			spi_miso.set_af(5);
+			spi_miso.set_type(Pin::OpenDrain);
+			spi_miso.set_mode(Pin::AF);
+			
+			spi_mosi.set_af(5);
+			spi_mosi.set_type(Pin::OpenDrain);
+			spi_mosi.set_mode(Pin::AF);
+			
+			SPI2.reg.CR2 = (1 << 12) | (7 << 8) | (1 << 6); // FRXTH, DS = 8bit, RXNEIE
+			SPI2.reg.CR1 = (1 << 7) | (1 << 6) | (1 << 1); // LSBFIRST, SPE, CPOL
+			
+			Interrupt::enable(Interrupt::SPI2);
+		}
+		
+		void spi_irq() {
+			ps_rblog.log("SPI2 interrupt, SR = %#06x", SPI2.reg.SR);
+			
+			// RXNE
+			if(SPI2.reg.SR & (1 << 0)) {
+				uint8_t data = SPI2.reg.DR8;
+				
+				ps_rblog.log("Received byte: %#04x", data);
+				
+				bool ack = received_byte(data);
+				
+				if(ack) {
+					ps_rblog.log("ACK");
+					spi_ack.off();
+					
+					for(int i = 0; i < 100; i++) {
+						asm volatile("nop");
+					}
+					
+					spi_ack.on();
+				} else {
+					ps_rblog.log("NAK");
+				}
+			}
+		}
+		
+		void set_state(uint32_t s) {
+			state = ~s;
+		}
+};
+
+SPI_PS spi_ps;
+
+template <>
+void interrupt<Interrupt::SPI2>() {
+	spi_ps.spi_irq();
+}
+
 USB_f1 usb(USB, dev_desc_p, conf_desc_p);
 
 uint32_t last_led_time;
@@ -315,6 +455,8 @@ int main() {
 	usb_dp.set_mode(Pin::AF);
 	usb_dp.set_af(14);
 	
+	spi_ps.init();
+	
 	RCC.enable(RCC.USB);
 	
 	usb.init();
@@ -419,6 +561,19 @@ int main() {
 			report_t report = {buttons, x, y};
 			
 			usb.write(1, (uint32_t*)&report, sizeof(report));
+			
+			uint32_t ps_state = 0;
+			ps_state |= buttons & (1 <<  0) ? 1 << 15 : 0; // B1
+			ps_state |= buttons & (1 <<  1) ? 1 << 10 : 0; // B2
+			ps_state |= buttons & (1 <<  2) ? 1 << 14 : 0; // B3
+			ps_state |= buttons & (1 <<  3) ? 1 << 11 : 0; // B4
+			ps_state |= buttons & (1 <<  4) ? 1 << 13 : 0; // B5
+			ps_state |= buttons & (1 <<  5) ? 1 <<  8 : 0; // B6
+			ps_state |= buttons & (1 <<  6) ? 1 <<  7 : 0; // B7
+			ps_state |= buttons & (1 << 10) ? 1 <<  0 : 0; // select
+			ps_state |= buttons & (1 <<  9) ? 1 <<  3 : 0; // start
+			
+			spi_ps.set_state(ps_state);
 		}
 	}
 }
