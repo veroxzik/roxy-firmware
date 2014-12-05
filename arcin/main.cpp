@@ -153,6 +153,42 @@ HID_arcin usb_hid(usb, report_desc_p);
 
 USB_strings usb_strings(usb, config.label);
 
+class Axis {
+	public:
+		virtual uint32_t get() = 0;
+};
+
+class QEAxis : public Axis {
+	private:
+		TIM_t& tim;
+	
+	public:
+		QEAxis(TIM_t& t) : tim(t) {}
+		
+		void enable(bool invert, int8_t sens) {
+			if(!invert) {
+				tim.CCER = 1 << 1;
+			}
+			
+			tim.CCMR1 = (1 << 8) | (1 << 0);
+			tim.SMCR = 3;
+			tim.CR1 = 1;
+			
+			if(sens < 0) {
+				tim.ARR = 256 * -sens - 1;
+			} else {
+				tim.ARR = 256 - 1;
+			}
+		}
+		
+		virtual uint32_t get() final {
+			return tim.CNT;
+		}
+};
+
+QEAxis axis_qe1(TIM2);
+QEAxis axis_qe2(TIM3);
+
 int main() {
 	rcc_init();
 	
@@ -190,46 +226,43 @@ int main() {
 	led2.set_mode(Pin::Output);
 	led2.on();
 	
-	RCC.enable(RCC.TIM2);
-	RCC.enable(RCC.TIM3);
+	Axis* axis_1;
 	
-	if(!(config.flags & (1 << 1))) {
-		TIM2.CCER = 1 << 1;
-	}
-	
-	TIM2.CCMR1 = (1 << 8) | (1 << 0);
-	TIM2.SMCR = 3;
-	TIM2.CR1 = 1;
-	
-	if(config.qe1_sens < 0) {
-		TIM2.ARR = 256 * -config.qe1_sens - 1;
+	if(0) {
+		// TODO: Analog mode.
+		
+		//axis_1 = &ana_1;
 	} else {
-		TIM2.ARR = 256 - 1;
+		RCC.enable(RCC.TIM2);
+		
+		axis_qe1.enable(config.flags & (1 << 1), config.qe1_sens);
+		
+		qe1a.set_af(1);
+		qe1b.set_af(1);
+		qe1a.set_mode(Pin::AF);
+		qe1b.set_mode(Pin::AF);
+		
+		axis_1 = &axis_qe1;
 	}
 	
-	if(!(config.flags & (1 << 2))) {
-		TIM3.CCER = 1 << 1;
-	}
+	Axis* axis_2;
 	
-	TIM3.CCMR1 = (1 << 8) | (1 << 0);
-	TIM3.SMCR = 3;
-	TIM3.CR1 = 1;
-	
-	if(config.qe2_sens < 0) {
-		TIM3.ARR = 256 * -config.qe2_sens - 1;
+	if(0) {
+		// TODO: Analog mode.
+		
+		//axis_2 = &ana_2;
 	} else {
-		TIM3.ARR = 256 - 1;
+		RCC.enable(RCC.TIM3);
+		
+		axis_qe2.enable(config.flags & (1 << 2), config.qe2_sens);
+		
+		qe2a.set_af(1);
+		qe2b.set_af(1);
+		qe2a.set_mode(Pin::AF);
+		qe2b.set_mode(Pin::AF);
+		
+		axis_2 = &axis_qe2;
 	}
-	
-	qe1a.set_af(1);
-	qe1b.set_af(1);
-	qe1a.set_mode(Pin::AF);
-	qe1b.set_mode(Pin::AF);
-	
-	qe2a.set_af(2);
-	qe2b.set_af(2);
-	qe2a.set_mode(Pin::AF);
-	qe2b.set_mode(Pin::AF);
 	
 	uint8_t last_x = 0;
 	uint8_t last_y = 0;
@@ -257,8 +290,8 @@ int main() {
 		}
 		
 		if(usb.ep_ready(1)) {
-			uint32_t qe1_count = TIM2.CNT;
-			uint32_t qe2_count = TIM3.CNT;
+			uint32_t qe1_count = axis_1->get();
+			uint32_t qe2_count = axis_2->get();
 			
 			int8_t rx = qe1_count - last_x;
 			int8_t ry = qe2_count - last_y;
