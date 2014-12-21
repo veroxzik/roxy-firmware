@@ -2,6 +2,7 @@
 #include <gpio/gpio.h>
 #include <interrupt/interrupt.h>
 #include <timer/timer.h>
+#include <adc/adc_f3.h>
 #include <os/time.h>
 #include <usb/usb.h>
 #include <usb/descriptor.h>
@@ -189,8 +190,49 @@ class QEAxis : public Axis {
 QEAxis axis_qe1(TIM2);
 QEAxis axis_qe2(TIM3);
 
+class AnalogAxis : public Axis {
+	private:
+		ADC_t& adc;
+		uint32_t ch;
+	
+	public:
+		AnalogAxis(ADC_t& a, uint32_t c) : adc(a), ch(c) {}
+		
+		void enable() {
+			// Turn on ADC regulator.
+			adc.CR = 0 << 28;
+			adc.CR = 1 << 28;
+			Time::sleep(2);
+			
+			// Calibrate ADC.
+			// TODO
+			
+			// Configure continous capture on one channel.
+			adc.CFGR = (1 << 13) | (1 << 12) | (1 << 5); // CONT, OVRMOD, ALIGN
+			adc.SQR1 = (ch << 6);
+			
+			// Enable ADC.
+			adc.CR |= 1 << 0; // ADEN
+			while(!(adc.ISR & (1 << 0))); // ADRDY
+			adc.ISR = (1 << 0); // ADRDY
+			
+			// Start conversion.
+			adc.CR |= 1 << 2; // ADSTART
+		}
+		
+		virtual uint32_t get() final {
+			return adc.DR >> 8;
+		}
+};
+
+AnalogAxis axis_ana1(ADC1, 2);
+AnalogAxis axis_ana2(ADC2, 4);
+
 int main() {
 	rcc_init();
+	
+	// Set ADC12PRES to /1.
+	RCC.CFGR2 |= (0x10 << 4);
 	
 	// Initialize system timer.
 	STK.LOAD = 72000000 / 8 / 1000; // 1000 Hz.
@@ -228,10 +270,13 @@ int main() {
 	
 	Axis* axis_1;
 	
-	if(0) {
-		// TODO: Analog mode.
+	if(1) {
+		RCC.enable(RCC.ADC12);
 		
-		//axis_1 = &ana_1;
+		axis_ana1.enable();
+		
+		axis_1 = &axis_ana1;
+		
 	} else {
 		RCC.enable(RCC.TIM2);
 		
@@ -247,10 +292,13 @@ int main() {
 	
 	Axis* axis_2;
 	
-	if(0) {
-		// TODO: Analog mode.
+	if(1) {
+		RCC.enable(RCC.ADC12);
 		
-		//axis_2 = &ana_2;
+		axis_ana2.enable();
+		
+		axis_2 = &axis_ana2;
+		
 	} else {
 		RCC.enable(RCC.TIM3);
 		
