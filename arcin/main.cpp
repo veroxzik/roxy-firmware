@@ -210,6 +210,7 @@ class AnalogAxis : public Axis {
 			// Configure continous capture on one channel.
 			adc.CFGR = (1 << 13) | (1 << 12) | (1 << 5); // CONT, OVRMOD, ALIGN
 			adc.SQR1 = (ch << 6);
+			adc.SMPR1 = (7 << (ch * 3)); // 72 MHz / 64 / 614 = apx. 1.8 kHz
 			
 			// Enable ADC.
 			adc.CR |= 1 << 0; // ADEN
@@ -231,8 +232,8 @@ AnalogAxis axis_ana2(ADC2, 4);
 int main() {
 	rcc_init();
 	
-	// Set ADC12PRES to /1.
-	RCC.CFGR2 |= (0x10 << 4);
+	// Set ADC12PRES to /64.
+	RCC.CFGR2 |= (0x19 << 4);
 	
 	// Initialize system timer.
 	STK.LOAD = 72000000 / 8 / 1000; // 1000 Hz.
