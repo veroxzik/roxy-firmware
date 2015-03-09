@@ -7,149 +7,11 @@
 #include <usb/descriptor.h>
 #include <usb/hid.h>
 
-static uint32_t& reset_reason = *(uint32_t*)0x10000000;
-
-static bool do_reset_bootloader;
-
-void reset_bootloader() {
-	reset_reason = 0xb007;
-	SCB.AIRCR = (0x5fa << 16) | (1 << 2); // SYSRESETREQ
-}
-
 auto report_desc = gamepad(
 	// Inputs.
-	buttons(11),
-	padding_in(5),
+	buttons(64),
 	
-	usage_page(UsagePage::Desktop),
-	usage(DesktopUsage::X),
-	logical_minimum(0),
-	logical_maximum(255),
-	report_count(1),
-	report_size(8),
-	input(0x02),
-
-	usage_page(UsagePage::Desktop),
-	usage(DesktopUsage::Y),
-	logical_minimum(0),
-	logical_maximum(255),
-	report_count(1),
-	report_size(8),
-	input(0x02),
-	
-	// Outputs.
-	usage_page(UsagePage::Ordinal),
-	usage(1),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(2),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(3),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(4),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(5),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(6),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(7),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(8),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(9),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(10),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	usage_page(UsagePage::Ordinal),
-	usage(11),
-	collection(Collection::Logical, 
-		usage_page(UsagePage::LED),
-		usage(0x4b),
-		report_size(1),
-		report_count(1),
-		output(0x02)
-	),
-	
-	padding_out(5),
-	
+	// Feature.
 	usage_page(0xff55),
 	usage(0xb007),
 	logical_minimum(0),
@@ -175,22 +37,11 @@ desc_t report_desc_p = {sizeof(report_desc), (void*)&report_desc};
 
 static Pin usb_dm = GPIOA[11];
 static Pin usb_dp = GPIOA[12];
-static Pin usb_pu = GPIOA[15];
 
 static PinArray button_inputs = GPIOB.array(0, 10);
 static PinArray button_leds = GPIOC.array(0, 10);
 
-static Pin qe1a = GPIOA[0];
-static Pin qe1b = GPIOA[1];
-static Pin qe2a = GPIOA[6];
-static Pin qe2b = GPIOA[7];
-
-static Pin led1 = GPIOA[8];
-static Pin led2 = GPIOA[9];
-
 USB_f1 usb(USB, dev_desc_p, conf_desc_p);
-
-uint32_t last_led_time;
 
 class HID_arcin : public USB_HID {
 	public:
@@ -198,8 +49,6 @@ class HID_arcin : public USB_HID {
 	
 	protected:
 		virtual bool set_output_report(uint32_t* buf, uint32_t len) {
-			last_led_time = Time::time();
-			button_leds.set(*buf);
 			return true;
 		}
 		
@@ -213,7 +62,7 @@ class HID_arcin : public USB_HID {
 					return true;
 				
 				case 0x10: // Reset to bootloader
-					do_reset_bootloader = true;
+					//do_reset_bootloader = true;
 					return true;
 				
 				default:
@@ -294,10 +143,111 @@ class USB_strings : public USB_class_driver {
 USB_strings usb_strings(usb);
 
 struct report_t {
-	uint16_t buttons;
-	uint8_t axis_x;
-	uint8_t axis_y;
+	uint64_t buttons;
 } __attribute__((packed));
+
+enum io_t : uint8_t {A, B, C, D, E};
+
+struct mapping_t {
+	io_t io;
+	uint8_t n;
+};
+
+const mapping_t map[][4] {
+	{
+		{E, 2},
+		{E, 4},
+		{E, 3},
+		{E, 5},
+	}, {
+		{C, 3},
+		{C, 1},
+		{C, 2},
+		{C, 0},
+	}, {
+		{A, 0},
+		{A, 2},
+		{A, 1},
+		{A, 3},
+	}, {
+		{A, 7},
+		{A, 5},
+		{A, 6},
+		{A, 4},
+	}, {
+		{B, 0},
+		{C, 5},
+		{B, 1},
+		{C, 4},
+	}, {
+		{E, 9},
+		{E, 7},
+		{E, 8},
+		{B, 2},
+	}, {
+		{E, 13},
+		{E, 11},
+		{E, 12},
+		{E, 10},
+	}, {
+		{B, 11},
+		{E, 15},
+		{B, 10},
+		{E, 14},
+	}, {
+		{B, 15},
+		{B, 13},
+		{B, 14},
+		{B, 12},
+	}, {
+		{D, 8},
+		{D, 10},
+		{D, 9},
+		{D, 11},
+	}, {
+		{D, 15},
+		{D, 13},
+		{D, 14},
+		{D, 12},
+	}, {
+		{C, 9},
+		{C, 7},
+		{C, 8},
+		{C, 6},
+	}, {
+		{D, 0},
+		{D, 2},
+		{D, 1},
+		{D, 3},
+	}, {
+		{D, 4},
+		{D, 6},
+		{D, 5},
+		{D, 7},
+	}, {
+		{B, 8},
+		{E, 0},
+		{B, 9},
+		{E, 1},
+	}, {
+		{A, 8},
+		{C, 10},
+		{A, 9},
+		{C, 11},
+	}
+};
+
+uint32_t bit(uint32_t w, uint32_t n) {
+	return w & (1 << n) ? 0 : 1;
+}
+
+GPIO_t* gpios[] = {
+	&GPIOA,
+	&GPIOB,
+	&GPIOC,
+	&GPIOD,
+	&GPIOE,
+};
 
 int main() {
 	rcc_init();
@@ -309,69 +259,52 @@ int main() {
 	RCC.enable(RCC.GPIOA);
 	RCC.enable(RCC.GPIOB);
 	RCC.enable(RCC.GPIOC);
+	RCC.enable(RCC.GPIOD);
+	RCC.enable(RCC.GPIOE);
 	
+	/*
 	usb_dm.set_mode(Pin::AF);
 	usb_dm.set_af(14);
 	usb_dp.set_mode(Pin::AF);
 	usb_dp.set_af(14);
+	*/
 	
 	RCC.enable(RCC.USB);
 	
 	usb.init();
 	
-	usb_pu.set_mode(Pin::Output);
-	usb_pu.on();
-	
-	button_inputs.set_mode(Pin::Input);
-	button_inputs.set_pull(Pin::PullUp);
-	
-	button_leds.set_mode(Pin::Output);
-	
-	led1.set_mode(Pin::Output);
-	led1.on();
-	
-	led2.set_mode(Pin::Output);
-	led2.on();
-	
-	RCC.enable(RCC.TIM2);
-	RCC.enable(RCC.TIM3);
-	
-	TIM2.CCMR1 = (1 << 8) | (1 << 0);
-	TIM2.CCER = 1 << 1;
-	TIM2.SMCR = 3;
-	TIM2.CR1 = 1;
-	
-	TIM3.CCMR1 = (1 << 8) | (1 << 0);
-	TIM3.CCER = 1 << 1;
-	TIM3.SMCR = 3;
-	TIM3.CR1 = 1;
-	
-	qe1a.set_af(1);
-	qe1b.set_af(1);
-	qe1a.set_mode(Pin::AF);
-	qe1b.set_mode(Pin::AF);
-	
-	qe2a.set_af(2);
-	qe2b.set_af(2);
-	qe2a.set_mode(Pin::AF);
-	qe2b.set_mode(Pin::AF);
+	for(uint32_t i = 0; i < 16; i++) {
+		for(uint32_t j = 0; j < 4; j++) {
+			auto& m = map[i][j];
+			
+			(*gpios[m.io])[m.n].set_mode(Pin::InputPull);
+			(*gpios[m.io])[m.n].on();
+		}
+	}
 	
 	while(1) {
 		usb.process();
 		
-		uint16_t buttons = button_inputs.get() ^ 0x7ff;
+		uint32_t inputs[] = {
+			GPIOA.reg.IDR,
+			GPIOB.reg.IDR,
+			GPIOC.reg.IDR,
+			GPIOD.reg.IDR,
+			GPIOE.reg.IDR,
+		};
 		
-		if(do_reset_bootloader) {
-			Time::sleep(10);
-			reset_bootloader();
-		}
+		uint64_t buttons = 0;
 		
-		if(Time::time() - last_led_time > 1000) {
-			button_leds.set(buttons);
+		for(uint32_t i = 0; i < 16; i++) {
+			for(uint32_t j = 0; j < 4; j++) {
+				auto& m = map[i][j];
+			
+				buttons |= bit(inputs[m.io], m.n) << i;
+			}
 		}
 		
 		if(usb.ep_ready(1)) {
-			report_t report = {buttons, uint8_t(TIM2.CNT), uint8_t(TIM3.CNT)};
+			report_t report = {buttons};
 			
 			usb.write(1, (uint32_t*)&report, sizeof(report));
 		}
