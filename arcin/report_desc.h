@@ -28,6 +28,8 @@ auto report_desc = gamepad(
 	
 	// Outputs.
 	report_id(2),
+	logical_minimum(0),
+	logical_maximum(1),
 	
 	usage_page(UsagePage::Ordinal),
 	usage(1),
@@ -141,6 +143,58 @@ auto report_desc = gamepad(
 	
 	padding_out(5),
 	
+	logical_maximum(255),
+	
+	usage_page(UsagePage::Ordinal),
+	usage(12),
+	collection(Collection::Logical, 
+		usage_page(UsagePage::LED),
+		usage(0x4b),
+		report_size(8),
+		report_count(1),
+		output(0x02)
+	),
+	
+	usage_page(UsagePage::Ordinal),
+	usage(13),
+	collection(Collection::Logical, 
+		usage_page(UsagePage::LED),
+		usage(0x4b),
+		report_size(8),
+		report_count(1),
+		output(0x02)
+	),
+	
+	usage_page(UsagePage::Ordinal),
+	usage(14),
+	collection(Collection::Logical, 
+		usage_page(UsagePage::LED),
+		usage(0x4b),
+		report_size(8),
+		report_count(1),
+		output(0x02)
+	),
+	
+	usage_page(UsagePage::Ordinal),
+	usage(15),
+	collection(Collection::Logical, 
+		usage_page(UsagePage::LED),
+		usage(0x4b),
+		report_size(8),
+		report_count(1),
+		output(0x02)
+	),
+	
+	usage_page(UsagePage::Ordinal),
+	usage(16),
+	collection(Collection::Logical, 
+		usage_page(UsagePage::LED),
+		usage(0x4b),
+		report_size(8),
+		report_count(1),
+		output(0x02)
+	),
+	
 	// Bootloader
 	report_id(0xb0),
 	
@@ -179,6 +233,11 @@ struct input_report_t {
 struct output_report_t {
 	uint8_t report_id;
 	uint16_t leds;
+	uint8_t led1;
+	uint8_t led2;
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
 } __attribute__((packed));
 
 struct bootloader_report_t {
