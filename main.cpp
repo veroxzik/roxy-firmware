@@ -498,6 +498,8 @@ int main() {
 	qe2a.set_mode(Pin::AF);
 	qe2b.set_mode(Pin::AF);
 	
+	uint32_t last_time = 0;
+	
 	uint8_t last_x = 0;
 	uint8_t last_y = 0;
 	
@@ -507,20 +509,22 @@ int main() {
 	while(1) {
 		usb.process();
 		
-		uint16_t buttons = button_inputs.get() ^ 0x7ff;
-		
 		if(do_reset_bootloader) {
 			Time::sleep(10);
 			reset_bootloader();
 		}
 		
-		if(Time::time() - last_led_time > 1000) {
+		uint16_t buttons = button_inputs.get() ^ 0x7ff;
+		uint8_t x = TIM2.CNT;
+		uint8_t y = TIM3.CNT;
+		uint32_t time = Time::time();
+		
+		if(time - last_led_time > 1000) {
 			button_leds.set(buttons);
 		}
 		
-		if(usb.ep_ready(1)) {
-			uint8_t x = TIM2.CNT;
-			uint8_t y = TIM3.CNT;
+		if(last_time != time) {
+			last_time = time;
 			int8_t rx = x - last_x;
 			int8_t ry = y - last_y;
 			last_x = x;
@@ -558,9 +562,6 @@ int main() {
 				buttons |= 1 << 14;
 			}
 			
-			report_t report = {buttons, x, y};
-			
-			usb.write(1, (uint32_t*)&report, sizeof(report));
 			
 			/*
 			uint32_t ps_state = (1 << 5) | (1 << 6) | (1 << 7);
@@ -591,6 +592,11 @@ int main() {
 			ps_state |= buttons & (1 << 12) ? 1 <<  6 : 0; // TT-
 			
 			spi_ps.set_state(ps_state);
+		}
+		
+		if(usb.ep_ready(1)) {
+			report_t report = {buttons, x, y};
+			usb.write(1, (uint32_t*)&report, sizeof(report));
 		}
 	}
 }
