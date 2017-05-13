@@ -395,8 +395,8 @@ int main() {
 		
 		axis_qe2.enable(config.flags & (1 << 2), config.qe2_sens);
 		
-		qe2a.set_af(1);
-		qe2b.set_af(1);
+		qe2a.set_af(2);
+		qe2b.set_af(2);
 		qe2a.set_mode(Pin::AF);
 		qe2b.set_mode(Pin::AF);
 		
