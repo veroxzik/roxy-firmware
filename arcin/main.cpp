@@ -7,6 +7,7 @@
 #include <os/time.h>
 #include <usb/usb.h>
 #include <usb/descriptor.h>
+#include <spi/spi.h>
 
 #include "report_desc.h"
 #include "usb_strings.h"
@@ -46,18 +47,25 @@ desc_t report_desc_p = {sizeof(report_desc), (void*)&report_desc};
 
 static Pin usb_dm = GPIOA[11];
 static Pin usb_dp = GPIOA[12];
-static Pin usb_pu = GPIOA[15];
 
-static PinArray button_inputs = GPIOB.array(0, 10);
-static PinArray button_leds = GPIOC.array(0, 10);
+//static PinArray button_inputs = GPIOB.array(0, 10);
+//static PinArray button_leds = GPIOC.array(0, 10);
+static Pin button_inputs[] = {
+  GPIOB[4], GPIOB[5], GPIOB[6], GPIOB[9], GPIOC[14], GPIOC[5],
+  GPIOB[1], GPIOB[10], GPIOC[7], GPIOC[9], GPIOA[9], GPIOB[7]};
+static Pin button_leds[] = {
+  GPIOA[15], GPIOC[11], GPIOB[3], GPIOC[13], GPIOC[15], GPIOB[0],
+  GPIOB[2], GPIOC[6], GPIOB[8], GPIOA[8], GPIOA[10], GPIOB[8]};
 
 static Pin qe1a = GPIOA[0];
 static Pin qe1b = GPIOA[1];
 static Pin qe2a = GPIOA[6];
 static Pin qe2b = GPIOA[7];
 
-static Pin led1 = GPIOA[8];
-static Pin led2 = GPIOA[9];
+static Pin rgb_sck = GPIOC[10];
+static Pin rgb_mosi = GPIOC[12];
+
+static Pin led1 = GPIOC[4];
 
 USB_f1 usb(USB, dev_desc_p, conf_desc_p);
 
@@ -142,12 +150,129 @@ class WS2812B {
 
 WS2812B ws2812b;
 
+// This class largely based on the Adafruit_TLC59711 library
+class TLC59711 {
+	private:
+		uint8_t numdrivers;
+		uint8_t bcr, bcg, bcb;	// Brightness
+		uint16_t pwmbuffer[12 * 1];	// Array for all channels
+
+		uint8_t count = 0;
+
+	public:
+		void init(uint8_t n) {
+			RCC.enable(RCC.SPI3);
+
+			// Initialize variables
+			numdrivers = 1;	// TODO: fix hardcode
+			bcr = bcg = bcb = 0x7F;	// Max brightness
+
+			rgb_sck.set_mode(Pin::AF);
+			rgb_sck.set_af(6);
+			rgb_sck.set_type(Pin::PushPull);
+			rgb_sck.set_pull(Pin::PullNone);
+			rgb_sck.set_speed(Pin::High);
+
+			rgb_mosi.set_mode(Pin::AF);
+			rgb_mosi.set_af(6);
+			rgb_mosi.set_type(Pin::PushPull);
+			rgb_mosi.set_pull(Pin::PullNone);
+			rgb_mosi.set_speed(Pin::High);
+
+			SPI3.reg.CR2 = (7 < 8);	//  DS = 8bit
+			//SPI3.reg.CR2 = (7 < 8);	//  DS = 16bit
+			//SPI3.reg.CR2 = (7 < 8) | (1 << 3);	//  DS = 8bit, NSSP = 1
+			//SPI3.reg.CR2 = (0xF < 8) | (1 << 3);	//  DS = 16bit, NSSP = 1
+			// CR1: LSBFIRST = 0 (default, MSBFIRST),  CPOL = 0 (default), CPHA = 0 (default)
+			SPI3.reg.CR1 = (1 << 9) | (1 << 8 ) | (5 << 3) | (1 << 2);	
+			// SSM = 1, SSI = 1, BR = 5 (FpCLK/64), MSTR = 1
+
+			// CRC = default (not used anyway)
+			SPI3.reg.CRCPR = 7;
+
+			// Enable (SPE = 1)
+			SPI3.reg.CR1 |= (1 << 6);
+		}
+
+		void write() {
+
+			//SPI3.transfer16(0xAABB);
+			//SPI3.transfer_byte(0x7C);
+
+			// SPI3.transfer_byte(count);
+			// SPI3.transfer16(count);
+			// count++;
+
+			uint32_t command = 0x25;	// Magic word
+			command <<= 5;
+			// OUTTMG = 1, EXTGCK = 0, TMGRST = 1, DSPRPT = 1, BLANK = 0 -> 0x16
+			command |= 0x16;
+			command <<= 7;
+			command |= bcr;
+			command <<= 7;
+			command |= bcg;
+			command <<= 7;
+			command |= bcb;
+
+			for (uint8_t n = 0; n < numdrivers; n++) {
+				// SPI3.transfer8(command >> 24);
+				// SPI3.transfer8(command >> 16);
+				// SPI3.transfer8(command >> 8);
+				// SPI3.transfer8(command);
+
+				// // 12 channels per TLC59711
+				// for (int8_t c = 11; c >= 0; c--) {
+				// 	SPI3.transfer8(pwmbuffer[n * 12 + c] >> 8);
+				// 	SPI3.transfer8(pwmbuffer[n * 12 + c]);
+				// }
+
+				SPI3.transfer16(command >> 16);
+				// SPI3.transfer_byte(command >> 16);
+				// SPI3.transfer_byte(command >> 8);
+				SPI3.transfer16(command);
+
+				// 12 channels per TLC59711
+				for (int8_t c = 11; c >= 0; c--) {
+					SPI3.transfer16(pwmbuffer[n * 12 + c]);
+				}
+			}
+		}
+
+		void set_pwm(uint8_t chan, uint16_t pwm) {
+			if (chan > 12 * numdrivers)
+				return;
+			pwmbuffer[chan] = pwm;
+		}
+
+		void set_led(uint8_t lednum, uint16_t r, uint16_t g, uint16_t b) {
+			set_pwm(lednum * 3, r);
+			set_pwm(lednum * 3 + 1, g);
+			set_pwm(lednum * 3 + 2, b);
+		}
+
+		void set_led_8bit(uint8_t lednum, uint8_t r, uint8_t g, uint8_t b) {
+			set_pwm(lednum * 3, (uint16_t)r * 256);
+			set_pwm(lednum * 3 + 1, (uint16_t)g * 256);
+			set_pwm(lednum * 3 + 2, (uint16_t)b * 256);
+		}
+
+		void set_brightness(uint8_t r, uint8_t g, uint8_t b) {
+			// BC valid range 0-127
+			bcr = r > 127 ? 127 : (r < 0 ? 0 : r);
+			bcg = g > 127 ? 127 : (g < 0 ? 0 : g);
+			bcb = b > 127 ? 127 : (b < 0 ? 0 : b);
+		}
+};
+
+TLC59711 tlc59711;
+
 template <>
 void interrupt<Interrupt::DMA1_Channel7>() {
 	ws2812b.irq();
 }
 
 uint32_t last_led_time;
+bool push_rgb = false;
 
 class HID_arcin : public USB_HID {
 	private:
@@ -201,10 +326,14 @@ class HID_arcin : public USB_HID {
 			output_report_t* report = (output_report_t*)buf;
 			
 			last_led_time = Time::time();
-			button_leds.set(report->leds);
+			for (int i = 0; i < 12; i++) {
+				button_leds[i].set((report->leds) >> i & 0x1);
+			}
+//			button_leds.set(report->leds);
 			
-			ws2812b.update(report->r, report->b, report->g);
-			
+			//ws2812b.update(report->r, report->b, report->g);
+			tlc59711.set_led_8bit(0, report->r, report->b, report->g);
+			push_rgb = true;
 			return true;
 		}
 		
@@ -345,23 +474,23 @@ int main() {
 	
 	usb.init();
 	
-	usb_pu.set_mode(Pin::Output);
-	usb_pu.on();
+// button_inputs.set_mode(Pin::Input);
+// button_inputs.set_pull(Pin::PullUp);
+  for (int i = 0; i < 12; i++) {
+    button_inputs[i].set_mode(Pin::Input);
+    button_inputs[i].set_pull(Pin::PullUp);
+    
+    button_leds[i].set_mode(Pin::Output);
+  }
 	
-	button_inputs.set_mode(Pin::Input);
-	button_inputs.set_pull(Pin::PullUp);
-	
-	button_leds.set_mode(Pin::Output);
+//	button_leds.set_mode(Pin::Output);
 	
 	led1.set_mode(Pin::Output);
 	led1.on();
 	
-	led2.set_mode(Pin::Output);
-	led2.on();
-	
 	Axis* axis_1;
 	
-	if(1) {
+	if(0) {
 		RCC.enable(RCC.ADC12);
 		
 		axis_ana1.enable();
@@ -377,13 +506,15 @@ int main() {
 		qe1b.set_af(1);
 		qe1a.set_mode(Pin::AF);
 		qe1b.set_mode(Pin::AF);
+		qe1a.set_pull(Pin::PullUp);
+		qe1b.set_pull(Pin::PullUp);
 		
 		axis_1 = &axis_qe1;
 	}
 	
 	Axis* axis_2;
 	
-	if(1) {
+	if(0) {
 		RCC.enable(RCC.ADC12);
 		
 		axis_ana2.enable();
@@ -399,11 +530,14 @@ int main() {
 		qe2b.set_af(2);
 		qe2a.set_mode(Pin::AF);
 		qe2b.set_mode(Pin::AF);
+		qe2a.set_pull(Pin::PullUp);
+		qe2b.set_pull(Pin::PullUp);
 		
 		axis_2 = &axis_qe2;
 	}
 	
-	ws2812b.init();
+	//ws2812b.init();
+	tlc59711.init(1);
 	
 	uint8_t last_x = 0;
 	uint8_t last_y = 0;
@@ -414,7 +548,16 @@ int main() {
 	while(1) {
 		usb.process();
 		
-		uint16_t buttons = button_inputs.get() ^ 0x7ff;
+//		uint16_t buttons = button_inputs.get() ^ 0x7ff;
+		uint16_t buttons = 0xfff;
+		for (int i = 0; i < 12; i++) {
+			buttons ^= button_inputs[i].get() << i;
+		}
+
+		// if(true) {
+		// 	tlc59711.write();
+		// 	buttons |= 0x4;
+		// }
 		
 		if(do_reset_bootloader) {
 			Time::sleep(10);
@@ -427,7 +570,19 @@ int main() {
 		}
 		
 		if(Time::time() - last_led_time > 1000) {
-			button_leds.set(buttons);
+			for (int i = 0; i < 12; i++) {
+				button_leds[i].set(buttons >> i & 0x1);
+			}
+			tlc59711.write();
+//			button_leds.set(buttons);
+
+			// // DEBUG
+			// buttons |= 0x1;
+		}
+
+		if (push_rgb) {
+			tlc59711.write();
+			push_rgb = false;
 		}
 		
 		if(usb.ep_ready(1)) {
@@ -466,15 +621,15 @@ int main() {
 			}
 			
 			if(state_x > 0) {
-				buttons |= 1 << 11;
-			} else if(state_x < 0) {
 				buttons |= 1 << 12;
+			} else if(state_x < 0) {
+				buttons |= 1 << 13;
 			}
 			
 			if(state_y > 0) {
-				buttons |= 1 << 13;
-			} else if(state_y < 0) {
 				buttons |= 1 << 14;
+			} else if(state_y < 0) {
+				buttons |= 1 << 15;
 			}
 			
 			if(config.qe1_sens < 0) {

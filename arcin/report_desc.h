@@ -7,8 +7,7 @@ auto report_desc = gamepad(
 	// Inputs.
 	report_id(1),
 	
-	buttons(15),
-	padding_in(1),
+	buttons(16),
 	
 	usage_page(UsagePage::Desktop),
 	usage(DesktopUsage::X),
