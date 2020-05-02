@@ -58,13 +58,15 @@ desc_t report_desc_p = {sizeof(report_desc), (void*)&report_desc};
 
 static Pin usb_dm = GPIOA[11];
 static Pin usb_dp = GPIOA[12];
-static Pin usb_pu = GPIOA[15];
 
-static PinArray button_inputs = GPIOB.array(0, 10);
-static PinArray button_leds = GPIOC.array(0, 10);
+static Pin button_inputs[] = {
+  GPIOB[4], GPIOB[5], GPIOB[6], GPIOB[9], GPIOC[14], GPIOC[5],
+  GPIOB[1], GPIOB[10], GPIOC[7], GPIOC[9], GPIOA[9], GPIOB[7]};
+static Pin button_leds[] = {
+  GPIOA[15], GPIOC[11], GPIOB[3], GPIOC[13], GPIOC[15], GPIOB[0],
+  GPIOB[2], GPIOC[6], GPIOB[8], GPIOA[8], GPIOA[10], GPIOB[8]};
 
-static Pin led1 = GPIOA[8];
-static Pin led2 = GPIOA[9];
+static Pin led1 = GPIOC[4];
 
 USB_f1 usb(USB, dev_desc_p, conf_desc_p);
 
@@ -260,7 +262,8 @@ bool normal_boot() {
 	}
 	
 	// Check buttons.
-	if((button_inputs.get() ^ 0x7ff) == ((1 << 1) | (1 << 0))) {
+	// If buttons 0 and 1 are pressed, do not boot to program.
+	if(button_inputs[0].get() == 0 && button_inputs[1].get() == 0) {
 		return false;
 	}
 	
@@ -279,13 +282,14 @@ int main() {
 	RCC.enable(RCC.GPIOB);
 	RCC.enable(RCC.GPIOC);
 	
-	button_inputs.set_mode(Pin::Input);
-	button_inputs.set_pull(Pin::PullUp);
-	
-	button_leds.set_mode(Pin::Output);
+	for (int i = 0; i < 12; i++) {
+		button_inputs[i].set_mode(Pin::Input);
+		button_inputs[i].set_pull(Pin::PullUp);
+		
+		button_leds[i].set_mode(Pin::Output);
+	}
 	
 	led1.set_mode(Pin::Output);
-	led2.set_mode(Pin::Output);
 	
 	if(normal_boot()) {
 		chainload(0x8002000);
@@ -306,10 +310,6 @@ int main() {
 	
 	usb.init();
 	
-	usb_pu.set_mode(Pin::Output);
-	usb_pu.on();
-	
-	
 	while(1) {
 		usb.process();
 		
@@ -318,6 +318,6 @@ int main() {
 			reset();
 		}
 		
-		GPIOC[0].set(Time::time() & 512);
+		button_leds[0].set(Time::time() & 512);
 	}
 }
