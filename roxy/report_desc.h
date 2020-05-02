@@ -193,6 +193,26 @@ auto report_desc = gamepad(
 		report_count(1),
 		output(0x02)
 	),
+
+	usage_page(UsagePage::Ordinal),
+	usage(17),
+	collection(Collection::Logical, 
+		usage_page(UsagePage::LED),
+		usage(0x4b),
+		report_size(8),
+		report_count(1),
+		output(0x02)
+	),
+
+	usage_page(UsagePage::Ordinal),
+	usage(18),
+	collection(Collection::Logical, 
+		usage_page(UsagePage::LED),
+		usage(0x4b),
+		report_size(8),
+		report_count(1),
+		output(0x02)
+	),
 	
 	// Bootloader
 	report_id(0xb0),
@@ -233,10 +253,12 @@ struct output_report_t {
 	uint8_t report_id;
 	uint16_t leds;
 	uint8_t led1;
-	uint8_t led2;
-	uint8_t r;
-	uint8_t g;
-	uint8_t b;
+	uint8_t r1;
+	uint8_t g1;
+	uint8_t b1;
+	uint8_t r2;
+	uint8_t g2;
+	uint8_t b2;
 } __attribute__((packed));
 
 struct bootloader_report_t {
