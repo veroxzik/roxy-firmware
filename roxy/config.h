@@ -10,6 +10,8 @@ struct config_t {
 	int8_t qe2_sens;
 	uint8_t ps2_mode;
 	uint8_t ws2812b_mode;
+	uint8_t rgb_mode;
+	uint8_t rgb_brightness;
 };
 
 #endif

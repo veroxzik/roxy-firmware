@@ -238,6 +238,10 @@ class TLC59711 {
 			bcg = g > 127 ? 127 : (g < 0 ? 0 : g);
 			bcb = b > 127 ? 127 : (b < 0 ? 0 : b);
 		}
+
+		void set_brightness(uint8_t brightness) {
+			set_brightness(brightness, brightness, brightness);
+		}
 };
 
 TLC59711 tlc59711;
@@ -509,7 +513,10 @@ int main() {
 	}
 	
 	//ws2812b.init();
-	tlc59711.init(1);
+	if(config.rgb_mode == 1) {
+		tlc59711.init(1);
+		tlc59711.set_brightness(config.rgb_brightness / 2);
+	}
 	
 	uint8_t last_x = 0;
 	uint8_t last_y = 0;
@@ -539,11 +546,11 @@ int main() {
 			for (int i = 0; i < 12; i++) {
 				button_leds[i].set(buttons >> i & 0x1);
 			}
-			tlc59711.write();
 		}
 
 		if (push_rgb) {
-			tlc59711.write();
+			if(config.rgb_mode == 1)
+				tlc59711.write();
 			push_rgb = false;
 		}
 		
