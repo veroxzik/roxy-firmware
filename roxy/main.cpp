@@ -53,7 +53,7 @@ static Pin button_inputs[] = {
   GPIOB[1], GPIOB[10], GPIOC[7], GPIOC[9], GPIOA[9], GPIOB[7]};
 static Pin button_leds[] = {
   GPIOA[15], GPIOC[11], GPIOB[3], GPIOC[13], GPIOC[15], GPIOB[0],
-  GPIOB[2], GPIOC[6], GPIOB[8], GPIOA[8], GPIOA[10], GPIOB[8]};
+  GPIOB[2], GPIOC[6], GPIOC[8], GPIOA[8], GPIOA[10], GPIOB[8]};
 
 static Pin qe1a = GPIOA[0];
 static Pin qe1b = GPIOA[1];
