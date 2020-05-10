@@ -76,10 +76,10 @@ class WS2812B {
 		void schedule_dma() {
 			cnt--;
 			
-			DMA1.reg.C[6].NDTR = 25;
-			DMA1.reg.C[6].MAR = (uint32_t)&dmabuf;
-			DMA1.reg.C[6].PAR = (uint32_t)&TIM4.CCR3;
-			DMA1.reg.C[6].CR = (0 << 10) | (1 << 8) | (1 << 7) | (0 << 6) | (1 << 4) | (1 << 1) | (1 << 0);
+			DMA2.reg.C[0].NDTR = 25;
+			DMA2.reg.C[0].MAR = (uint32_t)&dmabuf;
+			DMA2.reg.C[0].PAR = (uint32_t)&TIM8.CCR3;
+			DMA2.reg.C[0].CR = (0 << 10) | (1 << 8) | (1 << 7) | (0 << 6) | (1 << 4) | (1 << 1) | (1 << 0);
 		}
 		
 		void set_color(uint8_t r, uint8_t g, uint8_t b) {
@@ -102,23 +102,24 @@ class WS2812B {
 		
 	public:
 		void init() {
-			RCC.enable(RCC.TIM4);
-			RCC.enable(RCC.DMA1);
+			RCC.enable(RCC.TIM8);
+			RCC.enable(RCC.DMA2);
 			
-			Interrupt::enable(Interrupt::DMA1_Channel7);
+			Interrupt::enable(Interrupt::DMA2_Channel1);
 			
-			TIM4.ARR = (72000000 / 800000) - 1; // period = 90, 0 = 29, 1 = 58
-			TIM4.CCR3 = 0;
+			TIM8.ARR = (72000000 / 800000) - 1; // period = 90, 0 = 29, 1 = 58
+			TIM8.CCR3 = 0;
 			
-			TIM4.CCMR2 = (6 << 4) | (1 << 3);
-			TIM4.CCER = 1 << 8;
-			TIM4.DIER = 1 << 8;
+			TIM8.CCMR2 = (6 << 4) | (1 << 3);
+			TIM8.CCER = 1 << 10;	// CC3 complementary output enable
+			TIM8.DIER = 1 << 8;		// Update DMA request enable
+			TIM8.BDTR = 1 << 15;	// Main output enable
 			
-			GPIOB[8].set_af(2);
-			GPIOB[8].set_mode(Pin::AF);
-			GPIOB[8].set_pull(Pin::PullNone);
+			rgb_mosi.set_af(4);
+			rgb_mosi.set_mode(Pin::AF);
+			rgb_mosi.set_pull(Pin::PullNone);
 			
-			TIM4.CR1 = 1 << 0;
+			TIM8.CR1 = 1 << 0;
 			
 			Time::sleep(1);
 			
@@ -135,8 +136,8 @@ class WS2812B {
 		}
 		
 		void irq() {
-			DMA1.reg.C[6].CR = 0;
-			DMA1.reg.IFCR = 1 << 24;
+			DMA2.reg.C[0].CR = 0;
+			DMA2.reg.IFCR = 1 << 0;
 			
 			if(cnt) {
 				schedule_dma();
@@ -147,6 +148,11 @@ class WS2812B {
 };
 
 WS2812B ws2812b;
+
+template <>
+void interrupt<Interrupt::DMA2_Channel1>() {
+	ws2812b.irq();
+}
 
 // This class largely based on the Adafruit_TLC59711 library
 class TLC59711 {
@@ -246,11 +252,6 @@ class TLC59711 {
 
 TLC59711 tlc59711;
 
-template <>
-void interrupt<Interrupt::DMA1_Channel7>() {
-	ws2812b.irq();
-}
-
 uint32_t last_led_time;
 bool push_rgb = false;
 
@@ -312,12 +313,12 @@ class HID_arcin : public USB_HID {
 			
 			switch (config.rgb_mode) {
 				case 1:
-					tlc59711.set_led_8bit(0, report->r1, report->b1, report->g1);
-					tlc59711.set_led_8bit(1, report->r2, report->b2, report->g2);
+					tlc59711.set_led_8bit(0, report->r1, report->g1, report->b1);
+					tlc59711.set_led_8bit(1, report->r2, report->g2, report->b2);
 					push_rgb = true;
 					break;
 				case 2:
-					ws2812b.update(report->r1, report->b1, report->g1);
+					ws2812b.update(report->r1, report->g1, report->b1);
 					break;
 			}
 		
