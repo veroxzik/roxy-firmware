@@ -310,10 +310,17 @@ class HID_arcin : public USB_HID {
 				button_leds[i].set((report->leds) >> i & 0x1);
 			}
 			
-			//ws2812b.update(report->r, report->b, report->g);
-			tlc59711.set_led_8bit(0, report->r1, report->b1, report->g1);
-			tlc59711.set_led_8bit(1, report->r2, report->b2, report->g2);
-			push_rgb = true;
+			switch (config.rgb_mode) {
+				case 1:
+					tlc59711.set_led_8bit(0, report->r1, report->b1, report->g1);
+					tlc59711.set_led_8bit(1, report->r2, report->b2, report->g2);
+					push_rgb = true;
+					break;
+				case 2:
+					ws2812b.update(report->r1, report->b1, report->g1);
+					break;
+			}
+		
 			return true;
 		}
 		
@@ -512,10 +519,14 @@ int main() {
 		axis_2 = &axis_qe2;
 	}
 	
-	//ws2812b.init();
-	if(config.rgb_mode == 1) {
-		tlc59711.init(1);
-		tlc59711.set_brightness(config.rgb_brightness / 2);
+	switch(config.rgb_mode) {
+		case 1:
+			tlc59711.init(1);
+			tlc59711.set_brightness(config.rgb_brightness / 2);
+			break;
+		case 2:
+			ws2812b.init();
+			break;
 	}
 	
 	uint8_t last_x = 0;
