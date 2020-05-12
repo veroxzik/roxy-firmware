@@ -69,14 +69,14 @@ USB_f1 usb(USB, dev_desc_p, conf_desc_p);
 
 class WS2812B {
 	private:
-		uint8_t dmabuf[25];
+		uint8_t dmabuf[26];
 		volatile uint32_t cnt;
 		volatile bool busy;
 		
 		void schedule_dma() {
 			cnt--;
 			
-			DMA2.reg.C[0].NDTR = 25;
+			DMA2.reg.C[0].NDTR = 26;
 			DMA2.reg.C[0].MAR = (uint32_t)&dmabuf;
 			DMA2.reg.C[0].PAR = (uint32_t)&TIM8.CCR3;
 			DMA2.reg.C[0].CR = (0 << 10) | (1 << 8) | (1 << 7) | (0 << 6) | (1 << 4) | (1 << 1) | (1 << 0);
@@ -84,6 +84,9 @@ class WS2812B {
 		
 		void set_color(uint8_t r, uint8_t g, uint8_t b) {
 			uint32_t n = 0;
+
+			dmabuf[0] = 0;
+			n++;
 			
 			for(uint32_t i = 8; i-- > 0; n++) {
 				dmabuf[n] = g & (1 << i) ? 58 : 29;
