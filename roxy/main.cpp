@@ -79,7 +79,13 @@ class WS2812B {
 			DMA2.reg.C[0].NDTR = 26;
 			DMA2.reg.C[0].MAR = (uint32_t)&dmabuf;
 			DMA2.reg.C[0].PAR = (uint32_t)&TIM8.CCR3;
-			DMA2.reg.C[0].CR = (0 << 10) | (1 << 8) | (1 << 7) | (0 << 6) | (1 << 4) | (1 << 1) | (1 << 0);
+			DMA2.reg.C[0].CR = 	(0 << 10) |	// MSIZE = 8-bits 
+								(1 << 8) | 	// PSIZE = 16-bits
+								(1 << 7) | 	// Memory increment mode enabled
+								(0 << 6) | 	// Peipheral increment mode disabled
+								(1 << 4) | 	// Direction: read from memory
+								(1 << 1) | 	// Transfer complete interrupt enable
+								(1 << 0);	// Channel enable
 		}
 		
 		void set_color(uint8_t r, uint8_t g, uint8_t b) {
