@@ -12,6 +12,7 @@ struct config_t {
 	uint8_t ws2812b_mode;
 	uint8_t rgb_mode;
 	uint8_t rgb_brightness;
+	uint8_t debounce_time;
 };
 
 #endif

@@ -470,12 +470,18 @@ int main() {
 	RCC.enable(RCC.USB);
 	
 	usb.init();
+
+	uint32_t button_time[12];
+	bool last_state[12];
 	
 	for (int i = 0; i < 12; i++) {
 		button_inputs[i].set_mode(Pin::Input);
 		button_inputs[i].set_pull(Pin::PullUp);
 		
 		button_leds[i].set_mode(Pin::Output);
+
+		button_time[i] = Time::time();
+		last_state[i] = button_inputs[i].get();
 	}
 	
 	led1.set_mode(Pin::Output);
@@ -550,7 +556,15 @@ int main() {
 		
 		uint16_t buttons = 0xfff;
 		for (int i = 0; i < 12; i++) {
-			buttons ^= button_inputs[i].get() << i;
+			bool read = button_inputs[i].get();
+			if((Time::time() - button_time[i]) >= config.debounce_time)
+			{
+				if(last_state[i] != read)
+					button_time[i] = Time::time();
+
+				buttons ^= read << i;
+				last_state[i] = read;
+			}
 		}
 		
 		if(do_reset_bootloader) {
