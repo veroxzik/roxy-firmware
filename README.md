@@ -21,9 +21,13 @@ The entire Roxy project, including firmware, board files, and additional support
 
 ## Credits
 
-The original arcin project is released under the 2-clause BSD license.
+The original [arcin](https://cgit.jvnv.net/arcin/) project is released under the 2-clause BSD license.  
 Copyright (c) 2013, Vegard Storheil Eriksen
 
-Code driving the TLC59711 is largely based on the Adafruit TLC59711 library, released under the BSD license.
-Copyright (c) 2012, Adafruit Industries
+Additional arcin changes pulled from:  
+[MdxMaxX](https://github.com/MdXMaxX/arcin)  
+[Ziemas](https://github.com/Ziemas/arcin)
+
+Code driving the TLC59711 is largely based on the [Adafruit TLC59711 library](https://github.com/adafruit/Adafruit_TLC59711), released under the BSD license.  
+Copyright (c) 2012, Adafruit Industries  
 All rights reserved.
