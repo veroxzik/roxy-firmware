@@ -529,6 +529,12 @@ int main() {
 	
 	int8_t state_x = 0;
 	int8_t state_y = 0;
+
+	// Number of cycles TT buttons will turn off once no motion is detected
+	const int8_t tt_cycles = 50;
+
+	// Number of cycles remaining before the TT buttons can swap polarities
+	const int8_t tt_switch_threshold = 20;
 	
 	while(1) {
 		usb.process();
@@ -575,11 +581,11 @@ int main() {
 			int8_t rx = qe1_count - last_x;
 			int8_t ry = qe2_count - last_y;
 			
-			if(rx > 1) {
-				state_x = 100;
+			if(state_x > -tt_switch_threshold && rx > 1) {
+				state_x = tt_cycles;
 				last_x = qe1_count;
-			} else if(rx < -1) {
-				state_x = -100;
+			} else if(state_x < tt_switch_threshold && rx < -1) {
+				state_x = -tt_cycles;
 				last_x = qe1_count;
 			} else if(state_x > 0) {
 				state_x--;
@@ -588,12 +594,19 @@ int main() {
 				state_x++;
 				last_x = qe1_count;
 			}
+
+			if (state_x > 0 && rx > 0) {
+				state_x = tt_cycles;
+			}
+			if (state_x < 0 && rx < 0) {
+				state_x = -tt_cycles;
+			}
 			
-			if(ry > 1) {
-				state_y = 100;
+			if(state_y > -tt_switch_threshold && ry > 1) {
+				state_y = tt_cycles;
 				last_y = qe2_count;
-			} else if(ry < -1) {
-				state_y = -100;
+			} else if(state_y < tt_switch_threshold && ry < -1) {
+				state_y = -tt_cycles;
 				last_y = qe2_count;
 			} else if(state_y > 0) {
 				state_y--;
@@ -601,6 +614,13 @@ int main() {
 			} else if(state_y < 0) {
 				state_y++;
 				last_y = qe2_count;
+			}
+
+			if (state_y > 0 && ry > 0) {
+				state_y = tt_cycles;
+			}
+			if (state_y < 0 && ry < 0) {
+				state_y = -tt_cycles;
 			}
 			
 			if(state_x > 0) {
