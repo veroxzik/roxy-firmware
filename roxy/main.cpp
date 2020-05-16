@@ -311,8 +311,8 @@ class HID_arcin : public USB_HID {
 			}
 			
 			//ws2812b.update(report->r, report->b, report->g);
-			tlc59711.set_led_8bit(0, report->r1, report->b1, report->g1);
-			tlc59711.set_led_8bit(1, report->r2, report->b2, report->g2);
+			tlc59711.set_led_8bit(0, report->r1, report->g1, report->b1);
+			tlc59711.set_led_8bit(1, report->r2, report->g2, report->b2);
 			push_rgb = true;
 			return true;
 		}
