@@ -33,11 +33,11 @@ class USB_strings : public USB_class_driver {
 						break;
 					
 					case 1:
-						desc = u"\u0308zyp";
+						desc = u"\u0312VeroxZik";
 						break;
 					
 					case 2:
-						for(const char* p = "arcin"; *p; p++) {
+						for(const char* p = "Roxy"; *p; p++) {
 							buf[i++] = *p;
 						}
 						

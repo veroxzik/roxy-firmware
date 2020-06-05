@@ -39,7 +39,7 @@ Configloader rgb_configloader(0x8020000);
 config_t config;
 rgb_config_t rgb_config;
 
-auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1d50, 0x6080, 0x110, 1, 2, 3, 1);
+auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x16d0, 0x0f8b, 0x0002, 1, 2, 3, 1);
 auto conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
 	// HID interface.
 	interface_desc(0, 0, 1, 0x03, 0x00, 0x00, 0,
@@ -91,7 +91,6 @@ void interrupt<Interrupt::DMA2_Channel2>() {
 CHSV rgb_led1, rgb_led2;
 uint32_t last_led_time;
 uint32_t last_rgb_time;
-bool push_rgb = false;
 
 class HID_arcin : public USB_HID {
 	private:
@@ -172,7 +171,6 @@ class HID_arcin : public USB_HID {
 				case 2:
 					tlc59711.set_led_8bit(0, report->r1, report->g1, report->b1);
 					tlc59711.set_led_8bit(1, report->r2, report->g2, report->b2);
-					// push_rgb = true;
 					tlc59711.schedule_dma();
 					break;
 			}
@@ -403,6 +401,20 @@ int main() {
 
 	// Number of cycles remaining before the TT buttons can swap polarities
 	const int8_t tt_switch_threshold = 20;
+
+	// RGB variables
+	uint8_t rgb_update_period = 20;		// ms, Period of updating RGB
+	uint16_t breathing_period = 2000;	// ms, Period of low breathing
+	uint8_t breathing_brightness_low = 80;		// Max 255
+	uint8_t breathing_brightness_high = 180;	// Max 255
+	uint8_t led_steps_breathing = (uint8_t)((float)(breathing_brightness_high - breathing_brightness_low) / ((float)breathing_period / (float)rgb_update_period));
+	uint8_t brightness1 = breathing_brightness_low, brightness2 = breathing_brightness_low;
+	uint8_t led1_mode = 0, led2_mode = 0;
+
+	uint16_t flashing_period = 200;		// ms, Period of flashing when a knob is turned
+	uint8_t	flashing_brightness_low = 160;
+	uint8_t flashing_brightness_high = 255;
+	uint8_t led_steps_flashing = (uint8_t)((float)(flashing_brightness_high - flashing_brightness_low) / ((float)flashing_period / (float)rgb_update_period));
 	
 	while(1) {
 		usb.process();
@@ -428,108 +440,172 @@ int main() {
 		if(do_reset) {
 			Time::sleep(10);
 			reset();
+		}	
+		
+		uint32_t qe1_count = axis_1->get();
+		uint32_t qe2_count = axis_2->get();
+		
+		int8_t rx = qe1_count - last_x;
+		int8_t ry = qe2_count - last_y;
+		
+		if(state_x > -tt_switch_threshold && rx > 1) {
+			state_x = tt_cycles;
+			last_x = qe1_count;
+		} else if(state_x < tt_switch_threshold && rx < -1) {
+			state_x = -tt_cycles;
+			last_x = qe1_count;
+		} else if(state_x > 0) {
+			state_x--;
+			last_x = qe1_count;
+		} else if(state_x < 0) {
+			state_x++;
+			last_x = qe1_count;
+		}
+
+		if (state_x > 0 && rx > 0) {
+			state_x = tt_cycles;
+		}
+		if (state_x < 0 && rx < 0) {
+			state_x = -tt_cycles;
 		}
 		
+		if(state_y > -tt_switch_threshold && ry > 1) {
+			state_y = tt_cycles;
+			last_y = qe2_count;
+		} else if(state_y < tt_switch_threshold && ry < -1) {
+			state_y = -tt_cycles;
+			last_y = qe2_count;
+		} else if(state_y > 0) {
+			state_y--;
+			last_y = qe2_count;
+		} else if(state_y < 0) {
+			state_y++;
+			last_y = qe2_count;
+		}
+
+		if (state_y > 0 && ry > 0) {
+			state_y = tt_cycles;
+		}
+		if (state_y < 0 && ry < 0) {
+			state_y = -tt_cycles;
+		}
+		
+		if(state_x > 0) {
+			buttons |= 1 << 12;
+		} else if(state_x < 0) {
+			buttons |= 1 << 13;
+		}
+		
+		if(state_y > 0) {
+			buttons |= 1 << 14;
+		} else if(state_y < 0) {
+			buttons |= 1 << 15;
+		}
+		
+		if(config.qe1_sens < 0) {
+			qe1_count /= -config.qe1_sens;
+		} else if(config.qe1_sens > 0) {
+			qe1_count *= config.qe1_sens;
+		}
+		
+		if(config.qe2_sens < 0) {
+			qe2_count /= -config.qe2_sens;
+		} else if(config.qe2_sens > 0) {
+			qe2_count *= config.qe2_sens;
+		}
+		
+		input_report_t report = {1, buttons, uint8_t(qe1_count), uint8_t(qe2_count)};
+			
+		if(usb.ep_ready(1)) {
+			usb.write(1, (uint32_t*)&report, sizeof(report));
+		}
+
 		if(Time::time() - last_led_time > 1000) {
 			for (int i = 0; i < 12; i++) {
 				button_leds[i].set(buttons >> i & 0x1);
 			}
 
-			if(Time::time() - last_rgb_time > 100) {
+			if(Time::time() - last_rgb_time > rgb_update_period) {
 				// If TLC59711
 				if(config.rgb_mode == 2) {
 					// If knobs react to encoders
 					if(rgb_config.rgb_mode == 1) {
-						// rgb_led1 = CHSV(rgb_config.led1_hue, 255, 255);
-						// rgb_led2 = CHSV(rgb_config.led2_hue, 255, 255);
-						// CRGB rgb_temp1, rgb_temp2;
-						// hsv2rgb_rainbow(rgb_led1, rgb_temp1);
-						// tlc59711.set_led_8bit(0, rgb_temp1.r, rgb_temp1.g, rgb_temp1.b);
-						// hsv2rgb_rainbow(rgb_led2, rgb_temp2);
-						// tlc59711.set_led_8bit(1, rgb_temp2.r, rgb_temp2.g, rgb_temp2.b);
-						// push_rgb = true;
-						// last_rgb_time = Time::time();
+						if((state_x > 1 || state_x < -1) && (led1_mode == 0 || led1_mode == 1)) {
+							led1_mode = 2;
+							brightness1 = flashing_brightness_high - led_steps_flashing;
+						} else if(state_x == 0 && (led1_mode == 2 || led1_mode == 3)) {
+							led1_mode = 1;
+						}
+						if((state_y > 1 || state_y < -1) && (led2_mode == 0 || led2_mode == 1)) {
+							led2_mode = 2;
+							brightness2 = flashing_brightness_high - led_steps_flashing;
+						} else if(state_y == 0 && (led2_mode == 2 || led2_mode == 3)) {
+							led2_mode = 1;
+						}
+						switch(led1_mode){
+							case 0:
+								brightness1 += led_steps_breathing;
+								if(brightness1 >= breathing_brightness_high) {
+									led1_mode = 1;
+								}
+								break;
+							case 1:
+								brightness1 -= led_steps_breathing;
+								if(brightness1 <= breathing_brightness_low) {
+									led1_mode = 0;
+								}
+								break;
+							case 2:
+								brightness1 += led_steps_flashing;
+								if(brightness1 >= flashing_brightness_high) {
+									led1_mode = 3;
+								}
+								break;
+							case 3:
+								brightness1 -= led_steps_flashing;
+								if(brightness1 <= flashing_brightness_low) {
+									led1_mode = 0;
+								}
+								break;
+						}
+						switch(led2_mode){
+							case 0:
+								brightness2 += led_steps_breathing;
+								if(brightness2 >= breathing_brightness_high) {
+									led2_mode = 1;
+								}
+								break;
+							case 1:
+								brightness2 -= led_steps_breathing;
+								if(brightness2 <= breathing_brightness_low) {
+									led2_mode = 0;
+								}
+								break;
+							case 2:
+								brightness2 += led_steps_flashing;
+								if(brightness2 >= flashing_brightness_high) {
+									led2_mode = 3;
+								}
+								break;
+							case 3:
+								brightness2 -= led_steps_flashing;
+								if(brightness2 <= flashing_brightness_low) {
+									led2_mode = 0;
+								}
+								break;
+						}
+						rgb_led1 = CHSV(rgb_config.led1_hue, 255, brightness1);
+						rgb_led2 = CHSV(rgb_config.led2_hue, 255, brightness2);
+						CRGB rgb_temp1, rgb_temp2;
+						hsv2rgb_rainbow(rgb_led1, rgb_temp1);
+						tlc59711.set_led_8bit(0, rgb_temp1.r, rgb_temp1.g, rgb_temp1.b);
+						hsv2rgb_rainbow(rgb_led2, rgb_temp2);
+						tlc59711.set_led_8bit(1, rgb_temp2.r, rgb_temp2.g, rgb_temp2.b);
+						tlc59711.schedule_dma();
+						last_rgb_time = Time::time();
 					}
 				}
 			}
-		}
-		
-		if(usb.ep_ready(1)) {
-			uint32_t qe1_count = axis_1->get();
-			uint32_t qe2_count = axis_2->get();
-			
-			int8_t rx = qe1_count - last_x;
-			int8_t ry = qe2_count - last_y;
-			
-			if(state_x > -tt_switch_threshold && rx > 1) {
-				state_x = tt_cycles;
-				last_x = qe1_count;
-			} else if(state_x < tt_switch_threshold && rx < -1) {
-				state_x = -tt_cycles;
-				last_x = qe1_count;
-			} else if(state_x > 0) {
-				state_x--;
-				last_x = qe1_count;
-			} else if(state_x < 0) {
-				state_x++;
-				last_x = qe1_count;
-			}
-
-			if (state_x > 0 && rx > 0) {
-				state_x = tt_cycles;
-			}
-			if (state_x < 0 && rx < 0) {
-				state_x = -tt_cycles;
-			}
-			
-			if(state_y > -tt_switch_threshold && ry > 1) {
-				state_y = tt_cycles;
-				last_y = qe2_count;
-			} else if(state_y < tt_switch_threshold && ry < -1) {
-				state_y = -tt_cycles;
-				last_y = qe2_count;
-			} else if(state_y > 0) {
-				state_y--;
-				last_y = qe2_count;
-			} else if(state_y < 0) {
-				state_y++;
-				last_y = qe2_count;
-			}
-
-			if (state_y > 0 && ry > 0) {
-				state_y = tt_cycles;
-			}
-			if (state_y < 0 && ry < 0) {
-				state_y = -tt_cycles;
-			}
-			
-			if(state_x > 0) {
-				buttons |= 1 << 12;
-			} else if(state_x < 0) {
-				buttons |= 1 << 13;
-			}
-			
-			if(state_y > 0) {
-				buttons |= 1 << 14;
-			} else if(state_y < 0) {
-				buttons |= 1 << 15;
-			}
-			
-			if(config.qe1_sens < 0) {
-				qe1_count /= -config.qe1_sens;
-			} else if(config.qe1_sens > 0) {
-				qe1_count *= config.qe1_sens;
-			}
-			
-			if(config.qe2_sens < 0) {
-				qe2_count /= -config.qe2_sens;
-			} else if(config.qe2_sens > 0) {
-				qe2_count *= config.qe2_sens;
-			}
-			
-			input_report_t report = {1, buttons, uint8_t(qe1_count), uint8_t(qe2_count)};
-			
-			usb.write(1, (uint32_t*)&report, sizeof(report));
 		}
 	}
 }

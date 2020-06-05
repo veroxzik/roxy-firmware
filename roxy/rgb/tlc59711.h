@@ -15,8 +15,7 @@ class TLC59711 {
 		uint8_t numdrivers;
 		uint8_t bcr, bcg, bcb;	// Brightness
 		uint16_t pwmbuffer[2 + 12 * 6];	// Command (4 byte) + array for all channels, max of 6 TLC59711 supported
-
-		uint8_t count = 0;
+		volatile bool busy;
 
 	public:
 		void init(uint8_t n) {
@@ -71,6 +70,8 @@ class TLC59711 {
 		}
 
 		void schedule_dma() {
+
+			busy = true;
 
 			DMA2.reg.C[1].NDTR = 2 + 12 * numdrivers;
 			DMA2.reg.C[1].MAR = (uint32_t)&pwmbuffer;
@@ -132,6 +133,8 @@ class TLC59711 {
 		void irq() {
 			DMA2.reg.C[1].CR = 0;	// Disable channel
 			DMA2.reg.IFCR = (1 << 4);	// Clears all interrupt flags for Channel 2
+
+			busy = false;
 		}
 };
 

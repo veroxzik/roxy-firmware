@@ -43,7 +43,7 @@ auto report_desc = pack(
 		)
 );
 
-auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1d50, 0x6084, 0x110, 1, 2, 3, 1);
+auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x16d0, 0x0f8b, 0x0001, 1, 2, 3, 1);
 auto conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
 	// HID interface.
 	interface_desc(0, 0, 1, 0x03, 0x00, 0x00, 0,
@@ -213,11 +213,11 @@ class USB_strings : public USB_class_driver {
 						break;
 					
 					case 1:
-						desc = u"\u0308zyp";
+						desc = u"\u0312VeroxZik";
 						break;
 					
 					case 2:
-						desc = u"\u0322arcin bootloader";
+						desc = u"\u0322Roxy bootloader";
 						break;
 					
 					case 3:
