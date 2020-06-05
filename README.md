@@ -31,3 +31,7 @@ Additional arcin changes pulled from:
 Code driving the TLC59711 is largely based on the [Adafruit TLC59711 library](https://github.com/adafruit/Adafruit_TLC59711), released under the BSD license.  
 Copyright (c) 2012, Adafruit Industries  
 All rights reserved.
+
+Selected code and methods from [FastLED]
+(https://github.com/FastLED/FastLED), released under the MIT license  
+Copyright (c) 2013 FastLED

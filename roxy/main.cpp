@@ -13,6 +13,11 @@
 #include "usb_strings.h"
 #include "configloader.h"
 #include "config.h"
+#include "rgb/rgb_config.h"
+#include "rgb/ws2812b.h"
+#include "rgb/tlc59711.h"
+#include "rgb/pixeltypes.h"
+#include "rgb/hsv2rgb.h"
 
 static uint32_t& reset_reason = *(uint32_t*)0x10000000;
 
@@ -29,10 +34,12 @@ void reset_bootloader() {
 }
 
 Configloader configloader(0x801f800);
+Configloader rgb_configloader(0x8020000);
 
 config_t config;
+rgb_config_t rgb_config;
 
-auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1d50, 0x6080, 0x110, 1, 2, 3, 1);
+auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x16d0, 0x0f8b, 0x0002, 1, 2, 3, 1);
 auto conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
 	// HID interface.
 	interface_desc(0, 0, 1, 0x03, 0x00, 0x00, 0,
@@ -60,202 +67,35 @@ static Pin qe1b = GPIOA[1];
 static Pin qe2a = GPIOA[6];
 static Pin qe2b = GPIOA[7];
 
-static Pin rgb_sck = GPIOC[10];
-static Pin rgb_mosi = GPIOC[12];
+Pin rgb_sck = GPIOC[10];
+Pin rgb_mosi = GPIOC[12];
 
 static Pin led1 = GPIOC[4];
 
 USB_f1 usb(USB, dev_desc_p, conf_desc_p);
 
-class WS2812B {
-	private:
-		uint8_t dmabuf[25];
-		volatile uint32_t cnt;
-		volatile bool busy;
-		
-		void schedule_dma() {
-			cnt--;
-			
-			DMA1.reg.C[6].NDTR = 25;
-			DMA1.reg.C[6].MAR = (uint32_t)&dmabuf;
-			DMA1.reg.C[6].PAR = (uint32_t)&TIM4.CCR3;
-			DMA1.reg.C[6].CR = (0 << 10) | (1 << 8) | (1 << 7) | (0 << 6) | (1 << 4) | (1 << 1) | (1 << 0);
-		}
-		
-		void set_color(uint8_t r, uint8_t g, uint8_t b) {
-			uint32_t n = 0;
-			
-			for(uint32_t i = 8; i-- > 0; n++) {
-				dmabuf[n] = g & (1 << i) ? 58 : 29;
-			}
-			
-			for(uint32_t i = 8; i-- > 0; n++) {
-				dmabuf[n] = r & (1 << i) ? 58 : 29;
-			}
-			
-			for(uint32_t i = 8; i-- > 0; n++) {
-				dmabuf[n] = b & (1 << i) ? 58 : 29;
-			}
-			
-			dmabuf[n] = 0;
-		}
-		
-	public:
-		void init() {
-			RCC.enable(RCC.TIM4);
-			RCC.enable(RCC.DMA1);
-			
-			Interrupt::enable(Interrupt::DMA1_Channel7);
-			
-			TIM4.ARR = (72000000 / 800000) - 1; // period = 90, 0 = 29, 1 = 58
-			TIM4.CCR3 = 0;
-			
-			TIM4.CCMR2 = (6 << 4) | (1 << 3);
-			TIM4.CCER = 1 << 8;
-			TIM4.DIER = 1 << 8;
-			
-			GPIOB[8].set_af(2);
-			GPIOB[8].set_mode(Pin::AF);
-			GPIOB[8].set_pull(Pin::PullNone);
-			
-			TIM4.CR1 = 1 << 0;
-			
-			Time::sleep(1);
-			
-			update(0, 0, 0);
-		}
-		
-		void update(uint8_t r, uint8_t g, uint8_t b) {
-			set_color(r, g, b);
-			
-			cnt = 15;
-			busy = true;
-			
-			schedule_dma();
-		}
-		
-		void irq() {
-			DMA1.reg.C[6].CR = 0;
-			DMA1.reg.IFCR = 1 << 24;
-			
-			if(cnt) {
-				schedule_dma();
-			} else {
-				busy = false;
-			}
-		}
-};
-
-WS2812B ws2812b;
-
-// This class largely based on the Adafruit_TLC59711 library
-class TLC59711 {
-	private:
-		uint8_t numdrivers;
-		uint8_t bcr, bcg, bcb;	// Brightness
-		uint16_t pwmbuffer[12 * 1];	// Array for all channels
-
-		uint8_t count = 0;
-
-	public:
-		void init(uint8_t n) {
-			RCC.enable(RCC.SPI3);
-
-			// Initialize variables
-			numdrivers = 1;	// TODO: fix hardcode
-			bcr = bcg = bcb = 0x7F;	// Max brightness
-
-			rgb_sck.set_mode(Pin::AF);
-			rgb_sck.set_af(6);
-			rgb_sck.set_type(Pin::PushPull);
-			rgb_sck.set_pull(Pin::PullNone);
-			rgb_sck.set_speed(Pin::High);
-
-			rgb_mosi.set_mode(Pin::AF);
-			rgb_mosi.set_af(6);
-			rgb_mosi.set_type(Pin::PushPull);
-			rgb_mosi.set_pull(Pin::PullNone);
-			rgb_mosi.set_speed(Pin::High);
-
-			SPI3.reg.CR2 = (7 < 8);	//  DS = 8bit
-			// CR1: LSBFIRST = 0 (default, MSBFIRST),  CPOL = 0 (default), CPHA = 0 (default)
-			SPI3.reg.CR1 = (1 << 9) | (1 << 8 ) | (5 << 3) | (1 << 2);	
-			// SSM = 1, SSI = 1, BR = 5 (FpCLK/64), MSTR = 1
-
-			// CRC = default (not used anyway)
-			SPI3.reg.CRCPR = 7;
-
-			// Enable (SPE = 1)
-			SPI3.reg.CR1 |= (1 << 6);
-		}
-
-		void write() {
-
-			uint32_t command = 0x25;	// Magic word
-			command <<= 5;
-			// OUTTMG = 1, EXTGCK = 0, TMGRST = 1, DSPRPT = 1, BLANK = 0 -> 0x16
-			command |= 0x16;
-			command <<= 7;
-			command |= bcr;
-			command <<= 7;
-			command |= bcg;
-			command <<= 7;
-			command |= bcb;
-
-			for (uint8_t n = 0; n < numdrivers; n++) {
-
-				SPI3.transfer16(command >> 16);
-				SPI3.transfer16(command);
-
-				// 12 channels per TLC59711
-				for (int8_t c = 11; c >= 0; c--) {
-					SPI3.transfer16(pwmbuffer[n * 12 + c]);
-				}
-			}
-		}
-
-		void set_pwm(uint8_t chan, uint16_t pwm) {
-			if (chan > 12 * numdrivers)
-				return;
-			pwmbuffer[chan] = pwm;
-		}
-
-		void set_led(uint8_t lednum, uint16_t r, uint16_t g, uint16_t b) {
-			set_pwm(lednum * 3, r);
-			set_pwm(lednum * 3 + 1, g);
-			set_pwm(lednum * 3 + 2, b);
-		}
-
-		void set_led_8bit(uint8_t lednum, uint8_t r, uint8_t g, uint8_t b) {
-			set_pwm(lednum * 3, (uint16_t)r * 256);
-			set_pwm(lednum * 3 + 1, (uint16_t)g * 256);
-			set_pwm(lednum * 3 + 2, (uint16_t)b * 256);
-		}
-
-		void set_brightness(uint8_t r, uint8_t g, uint8_t b) {
-			// BC valid range 0-127
-			bcr = r > 127 ? 127 : (r < 0 ? 0 : r);
-			bcg = g > 127 ? 127 : (g < 0 ? 0 : g);
-			bcb = b > 127 ? 127 : (b < 0 ? 0 : b);
-		}
-
-		void set_brightness(uint8_t brightness) {
-			set_brightness(brightness, brightness, brightness);
-		}
-};
-
-TLC59711 tlc59711;
+WS2812B ws2812b;	// In rgb/ws2812b.h
 
 template <>
-void interrupt<Interrupt::DMA1_Channel7>() {
+void interrupt<Interrupt::DMA2_Channel1>() {
 	ws2812b.irq();
 }
 
+TLC59711 tlc59711;	// In rgb/tlc59711.h
+
+template <>
+void interrupt<Interrupt::DMA2_Channel2>() {
+	tlc59711.irq();
+}
+
+CHSV rgb_led1, rgb_led2;
 uint32_t last_led_time;
-bool push_rgb = false;
+uint32_t last_rgb_time;
 
 class HID_arcin : public USB_HID {
 	private:
+		uint8_t config_id = 0;
+
 		bool set_feature_bootloader(bootloader_report_t* report) {
 			switch(report->func) {
 				case 0:
@@ -275,21 +115,35 @@ class HID_arcin : public USB_HID {
 		}
 		
 		bool set_feature_config(config_report_t* report) {
-			if(report->segment != 0) {
+			if(report->segment == 0) {
+				configloader.write(report->size, report->data);
+			} else if(report->segment == 1) {
+				rgb_configloader.write(report->size, report->data);
+			} else {
 				return false;
 			}
-			
-			configloader.write(report->size, report->data);
 			
 			return true;
 		}
 		
 		bool get_feature_config() {
-			config_report_t report = {0xc0, 0, sizeof(config)};
+			if(config_id == 0) {
+				config_report_t report = {0xc0, 0, sizeof(config)};
 			
-			memcpy(report.data, &config, sizeof(config));
-			
-			usb.write(0, (uint32_t*)&report, sizeof(report));
+				memcpy(report.data, &config, sizeof(config));
+				
+				usb.write(0, (uint32_t*)&report, sizeof(report));
+
+				config_id = 1;
+			} else {
+				config_report_t rgb_report = {0xc0, 1, sizeof(rgb_config)};
+
+				memcpy(rgb_report.data, &rgb_config, sizeof(rgb_config));
+				
+				usb.write(0, (uint32_t*)&rgb_report, sizeof(rgb_report));
+
+				config_id = 0;
+			}
 			
 			return true;
 		}
@@ -310,10 +164,17 @@ class HID_arcin : public USB_HID {
 				button_leds[i].set((report->leds) >> i & 0x1);
 			}
 			
-			//ws2812b.update(report->r, report->b, report->g);
-			tlc59711.set_led_8bit(0, report->r1, report->g1, report->b1);
-			tlc59711.set_led_8bit(1, report->r2, report->g2, report->b2);
-			push_rgb = true;
+			switch (config.rgb_mode) {
+				case 1:
+					ws2812b.update(report->r1, report->g1, report->b1);
+					break;
+				case 2:
+					tlc59711.set_led_8bit(0, report->r1, report->g1, report->b1);
+					tlc59711.set_led_8bit(1, report->r2, report->g2, report->b2);
+					tlc59711.schedule_dma();
+					break;
+			}
+		
 			return true;
 		}
 		
@@ -342,7 +203,7 @@ class HID_arcin : public USB_HID {
 			switch(report_id) {
 				case 0xc0:
 					return get_feature_config();
-				
+
 				default:
 					return false;
 			}
@@ -440,6 +301,7 @@ int main() {
 	
 	// Load config.
 	configloader.read(sizeof(config), &config);
+	rgb_configloader.read(sizeof(rgb_config), &rgb_config);
 	
 	RCC.enable(RCC.GPIOA);
 	RCC.enable(RCC.GPIOB);
@@ -518,10 +380,14 @@ int main() {
 		axis_2 = &axis_qe2;
 	}
 	
-	//ws2812b.init();
-	if(config.rgb_mode == 1) {
-		tlc59711.init(1);
-		tlc59711.set_brightness(config.rgb_brightness / 2);
+	switch(config.rgb_mode) {
+		case 1:
+			ws2812b.init();
+			break;
+		case 2:
+			tlc59711.init(1);
+			tlc59711.set_brightness(config.rgb_brightness / 2);
+			break;
 	}
 	
 	uint8_t last_x = 0;
@@ -535,6 +401,20 @@ int main() {
 
 	// Number of cycles remaining before the TT buttons can swap polarities
 	const int8_t tt_switch_threshold = 20;
+
+	// RGB variables
+	uint8_t rgb_update_period = 20;		// ms, Period of updating RGB
+	uint16_t breathing_period = 2000;	// ms, Period of low breathing
+	uint8_t breathing_brightness_low = 80;		// Max 255
+	uint8_t breathing_brightness_high = 180;	// Max 255
+	uint8_t led_steps_breathing = (uint8_t)((float)(breathing_brightness_high - breathing_brightness_low) / ((float)breathing_period / (float)rgb_update_period));
+	uint8_t brightness1 = breathing_brightness_low, brightness2 = breathing_brightness_low;
+	uint8_t led1_mode = 0, led2_mode = 0;
+
+	uint16_t flashing_period = 200;		// ms, Period of flashing when a knob is turned
+	uint8_t	flashing_brightness_low = 160;
+	uint8_t flashing_brightness_high = 255;
+	uint8_t led_steps_flashing = (uint8_t)((float)(flashing_brightness_high - flashing_brightness_low) / ((float)flashing_period / (float)rgb_update_period));
 	
 	while(1) {
 		usb.process();
@@ -560,96 +440,172 @@ int main() {
 		if(do_reset) {
 			Time::sleep(10);
 			reset();
+		}	
+		
+		uint32_t qe1_count = axis_1->get();
+		uint32_t qe2_count = axis_2->get();
+		
+		int8_t rx = qe1_count - last_x;
+		int8_t ry = qe2_count - last_y;
+		
+		if(state_x > -tt_switch_threshold && rx > 1) {
+			state_x = tt_cycles;
+			last_x = qe1_count;
+		} else if(state_x < tt_switch_threshold && rx < -1) {
+			state_x = -tt_cycles;
+			last_x = qe1_count;
+		} else if(state_x > 0) {
+			state_x--;
+			last_x = qe1_count;
+		} else if(state_x < 0) {
+			state_x++;
+			last_x = qe1_count;
+		}
+
+		if (state_x > 0 && rx > 0) {
+			state_x = tt_cycles;
+		}
+		if (state_x < 0 && rx < 0) {
+			state_x = -tt_cycles;
 		}
 		
+		if(state_y > -tt_switch_threshold && ry > 1) {
+			state_y = tt_cycles;
+			last_y = qe2_count;
+		} else if(state_y < tt_switch_threshold && ry < -1) {
+			state_y = -tt_cycles;
+			last_y = qe2_count;
+		} else if(state_y > 0) {
+			state_y--;
+			last_y = qe2_count;
+		} else if(state_y < 0) {
+			state_y++;
+			last_y = qe2_count;
+		}
+
+		if (state_y > 0 && ry > 0) {
+			state_y = tt_cycles;
+		}
+		if (state_y < 0 && ry < 0) {
+			state_y = -tt_cycles;
+		}
+		
+		if(state_x > 0) {
+			buttons |= 1 << 12;
+		} else if(state_x < 0) {
+			buttons |= 1 << 13;
+		}
+		
+		if(state_y > 0) {
+			buttons |= 1 << 14;
+		} else if(state_y < 0) {
+			buttons |= 1 << 15;
+		}
+		
+		if(config.qe1_sens < 0) {
+			qe1_count /= -config.qe1_sens;
+		} else if(config.qe1_sens > 0) {
+			qe1_count *= config.qe1_sens;
+		}
+		
+		if(config.qe2_sens < 0) {
+			qe2_count /= -config.qe2_sens;
+		} else if(config.qe2_sens > 0) {
+			qe2_count *= config.qe2_sens;
+		}
+		
+		input_report_t report = {1, buttons, uint8_t(qe1_count), uint8_t(qe2_count)};
+			
+		if(usb.ep_ready(1)) {
+			usb.write(1, (uint32_t*)&report, sizeof(report));
+		}
+
 		if(Time::time() - last_led_time > 1000) {
 			for (int i = 0; i < 12; i++) {
 				button_leds[i].set(buttons >> i & 0x1);
 			}
-		}
 
-		if (push_rgb) {
-			if(config.rgb_mode == 1)
-				tlc59711.write();
-			push_rgb = false;
-		}
-		
-		if(usb.ep_ready(1)) {
-			uint32_t qe1_count = axis_1->get();
-			uint32_t qe2_count = axis_2->get();
-			
-			int8_t rx = qe1_count - last_x;
-			int8_t ry = qe2_count - last_y;
-			
-			if(state_x > -tt_switch_threshold && rx > 1) {
-				state_x = tt_cycles;
-				last_x = qe1_count;
-			} else if(state_x < tt_switch_threshold && rx < -1) {
-				state_x = -tt_cycles;
-				last_x = qe1_count;
-			} else if(state_x > 0) {
-				state_x--;
-				last_x = qe1_count;
-			} else if(state_x < 0) {
-				state_x++;
-				last_x = qe1_count;
+			if(Time::time() - last_rgb_time > rgb_update_period) {
+				// If TLC59711
+				if(config.rgb_mode == 2) {
+					// If knobs react to encoders
+					if(rgb_config.rgb_mode == 1) {
+						if((state_x > 1 || state_x < -1) && (led1_mode == 0 || led1_mode == 1)) {
+							led1_mode = 2;
+							brightness1 = flashing_brightness_high - led_steps_flashing;
+						} else if(state_x == 0 && (led1_mode == 2 || led1_mode == 3)) {
+							led1_mode = 1;
+						}
+						if((state_y > 1 || state_y < -1) && (led2_mode == 0 || led2_mode == 1)) {
+							led2_mode = 2;
+							brightness2 = flashing_brightness_high - led_steps_flashing;
+						} else if(state_y == 0 && (led2_mode == 2 || led2_mode == 3)) {
+							led2_mode = 1;
+						}
+						switch(led1_mode){
+							case 0:
+								brightness1 += led_steps_breathing;
+								if(brightness1 >= breathing_brightness_high) {
+									led1_mode = 1;
+								}
+								break;
+							case 1:
+								brightness1 -= led_steps_breathing;
+								if(brightness1 <= breathing_brightness_low) {
+									led1_mode = 0;
+								}
+								break;
+							case 2:
+								brightness1 += led_steps_flashing;
+								if(brightness1 >= flashing_brightness_high) {
+									led1_mode = 3;
+								}
+								break;
+							case 3:
+								brightness1 -= led_steps_flashing;
+								if(brightness1 <= flashing_brightness_low) {
+									led1_mode = 0;
+								}
+								break;
+						}
+						switch(led2_mode){
+							case 0:
+								brightness2 += led_steps_breathing;
+								if(brightness2 >= breathing_brightness_high) {
+									led2_mode = 1;
+								}
+								break;
+							case 1:
+								brightness2 -= led_steps_breathing;
+								if(brightness2 <= breathing_brightness_low) {
+									led2_mode = 0;
+								}
+								break;
+							case 2:
+								brightness2 += led_steps_flashing;
+								if(brightness2 >= flashing_brightness_high) {
+									led2_mode = 3;
+								}
+								break;
+							case 3:
+								brightness2 -= led_steps_flashing;
+								if(brightness2 <= flashing_brightness_low) {
+									led2_mode = 0;
+								}
+								break;
+						}
+						rgb_led1 = CHSV(rgb_config.led1_hue, 255, brightness1);
+						rgb_led2 = CHSV(rgb_config.led2_hue, 255, brightness2);
+						CRGB rgb_temp1, rgb_temp2;
+						hsv2rgb_rainbow(rgb_led1, rgb_temp1);
+						tlc59711.set_led_8bit(0, rgb_temp1.r, rgb_temp1.g, rgb_temp1.b);
+						hsv2rgb_rainbow(rgb_led2, rgb_temp2);
+						tlc59711.set_led_8bit(1, rgb_temp2.r, rgb_temp2.g, rgb_temp2.b);
+						tlc59711.schedule_dma();
+						last_rgb_time = Time::time();
+					}
+				}
 			}
-
-			if (state_x > 0 && rx > 0) {
-				state_x = tt_cycles;
-			}
-			if (state_x < 0 && rx < 0) {
-				state_x = -tt_cycles;
-			}
-			
-			if(state_y > -tt_switch_threshold && ry > 1) {
-				state_y = tt_cycles;
-				last_y = qe2_count;
-			} else if(state_y < tt_switch_threshold && ry < -1) {
-				state_y = -tt_cycles;
-				last_y = qe2_count;
-			} else if(state_y > 0) {
-				state_y--;
-				last_y = qe2_count;
-			} else if(state_y < 0) {
-				state_y++;
-				last_y = qe2_count;
-			}
-
-			if (state_y > 0 && ry > 0) {
-				state_y = tt_cycles;
-			}
-			if (state_y < 0 && ry < 0) {
-				state_y = -tt_cycles;
-			}
-			
-			if(state_x > 0) {
-				buttons |= 1 << 12;
-			} else if(state_x < 0) {
-				buttons |= 1 << 13;
-			}
-			
-			if(state_y > 0) {
-				buttons |= 1 << 14;
-			} else if(state_y < 0) {
-				buttons |= 1 << 15;
-			}
-			
-			if(config.qe1_sens < 0) {
-				qe1_count /= -config.qe1_sens;
-			} else if(config.qe1_sens > 0) {
-				qe1_count *= config.qe1_sens;
-			}
-			
-			if(config.qe2_sens < 0) {
-				qe2_count /= -config.qe2_sens;
-			} else if(config.qe2_sens > 0) {
-				qe2_count *= config.qe2_sens;
-			}
-			
-			input_report_t report = {1, buttons, uint8_t(qe1_count), uint8_t(qe2_count)};
-			
-			usb.write(1, (uint32_t*)&report, sizeof(report));
 		}
 	}
 }
