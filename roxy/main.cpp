@@ -52,8 +52,8 @@ desc_t dev_desc_p = {sizeof(dev_desc), (void*)&dev_desc};
 desc_t conf_desc_p = {sizeof(conf_desc), (void*)&conf_desc};
 desc_t report_desc_p = {sizeof(report_desc), (void*)&report_desc};
 
-auto iidx_dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1CCF, 0x8048, 0x100, 1, 2, 3, 1);
-auto iidx_conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
+auto iidx_dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1ccf, 0x8048, 0x100, 1, 2, 3, 1);
+auto konami_conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
 	// HID interface.
 	interface_desc(0, 0, 1, 0x03, 0x00, 0x00, 0,
 		hid_desc(0x111, 0, 1, 0x22, sizeof(report_desc)),
@@ -62,7 +62,10 @@ auto iidx_conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
 );
 
 desc_t iidx_dev_desc_p = {sizeof(iidx_dev_desc), (void*)&iidx_dev_desc};
-desc_t iidx_conf_desc_p = {sizeof(iidx_conf_desc), (void*)&iidx_conf_desc};
+desc_t konami_conf_desc_p = {sizeof(konami_conf_desc), (void*)&konami_conf_desc};
+
+auto sdvx_dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1ccf, 0x101c, 0x100, 1, 2, 3, 1);
+desc_t sdvx_dev_desc_p = {sizeof(sdvx_dev_desc), (void*)&sdvx_dev_desc};
 
 static Pin usb_dm = GPIOA[11];
 static Pin usb_dp = GPIOA[12];
@@ -85,7 +88,8 @@ Pin rgb_mosi = GPIOC[12];
 static Pin led1 = GPIOC[4];
 
 USB_f1 roxy_usb(USB, dev_desc_p, conf_desc_p);
-USB_f1 iidx_usb(USB, iidx_dev_desc_p, iidx_conf_desc_p);
+USB_f1 iidx_usb(USB, iidx_dev_desc_p, konami_conf_desc_p);
+USB_f1 sdvx_usb(USB, sdvx_dev_desc_p, konami_conf_desc_p);
 
 WS2812B ws2812b;	// In rgb/ws2812b.h
 
@@ -225,9 +229,11 @@ class HID_arcin : public USB_HID {
 
 HID_arcin usb_roxy_hid(roxy_usb, report_desc_p);
 HID_arcin usb_iidx_hid(iidx_usb, report_desc_p);
+HID_arcin usb_sdvx_hid(sdvx_usb, report_desc_p);
 
 USB_strings usb_roxy_strings(roxy_usb, config.label, 0);
 USB_strings usb_iidx_strings(iidx_usb, config.label, 1);
+USB_strings usb_sdvx_strings(sdvx_usb, config.label, 2);
 
 class Axis {
 	public:
@@ -335,6 +341,9 @@ int main() {
 	{
 		case 1:
 			usb = &iidx_usb;
+			break;
+		case 2:
+			usb = &sdvx_usb;
 			break;
 		default:
 			usb = &roxy_usb;

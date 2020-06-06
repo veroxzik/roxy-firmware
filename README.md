@@ -26,7 +26,8 @@ Copyright (c) 2013, Vegard Storheil Eriksen
 
 Additional arcin changes pulled from:  
 [MdxMaxX](https://github.com/MdXMaxX/arcin)  
-[Ziemas](https://github.com/Ziemas/arcin)
+[Ziemas](https://github.com/Ziemas/arcin)  
+[SirusDoma](https://github.com/SirusDoma/arcin)
 
 Code driving the TLC59711 is largely based on the [Adafruit TLC59711 library](https://github.com/adafruit/Adafruit_TLC59711), released under the BSD license.  
 Copyright (c) 2012, Adafruit Industries  

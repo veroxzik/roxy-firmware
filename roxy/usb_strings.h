@@ -39,6 +39,7 @@ class USB_strings : public USB_class_driver {
 								desc = u"\u0312VeroxZik";
 								break;
 							case 1:
+							case 2:
 								desc = u"\u0322Konami Amusement";
 								break;
 						}
@@ -68,6 +69,9 @@ class USB_strings : public USB_class_driver {
 								break;
 							case 1:
 								desc = u"\u0350beatmania IIDX controller premium model";
+								break;
+							case 2:
+								desc = u"\u0330SOUND VOLTEX controller";
 								break;
 						}
 						break;
