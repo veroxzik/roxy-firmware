@@ -3,7 +3,7 @@
 
 #include <usb/hid.h>
 
-auto report_desc = gamepad(
+auto report_desc = joystick(
 	// Inputs.
 	report_id(1),
 	

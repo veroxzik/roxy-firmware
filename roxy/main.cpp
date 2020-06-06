@@ -52,6 +52,18 @@ desc_t dev_desc_p = {sizeof(dev_desc), (void*)&dev_desc};
 desc_t conf_desc_p = {sizeof(conf_desc), (void*)&conf_desc};
 desc_t report_desc_p = {sizeof(report_desc), (void*)&report_desc};
 
+auto iidx_dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1CCF, 0x8048, 0x100, 1, 2, 3, 1);
+auto iidx_conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
+	// HID interface.
+	interface_desc(0, 0, 1, 0x03, 0x00, 0x00, 0,
+		hid_desc(0x111, 0, 1, 0x22, sizeof(report_desc)),
+		endpoint_desc(0x81, 0x03, 16, 4)
+	)
+);
+
+desc_t iidx_dev_desc_p = {sizeof(iidx_dev_desc), (void*)&iidx_dev_desc};
+desc_t iidx_conf_desc_p = {sizeof(iidx_conf_desc), (void*)&iidx_conf_desc};
+
 static Pin usb_dm = GPIOA[11];
 static Pin usb_dp = GPIOA[12];
 
@@ -72,7 +84,8 @@ Pin rgb_mosi = GPIOC[12];
 
 static Pin led1 = GPIOC[4];
 
-USB_f1 usb(USB, dev_desc_p, conf_desc_p);
+USB_f1 roxy_usb(USB, dev_desc_p, conf_desc_p);
+USB_f1 iidx_usb(USB, iidx_dev_desc_p, iidx_conf_desc_p);
 
 WS2812B ws2812b;	// In rgb/ws2812b.h
 
@@ -210,9 +223,11 @@ class HID_arcin : public USB_HID {
 		}
 };
 
-HID_arcin usb_hid(usb, report_desc_p);
+HID_arcin usb_roxy_hid(roxy_usb, report_desc_p);
+HID_arcin usb_iidx_hid(iidx_usb, report_desc_p);
 
-USB_strings usb_strings(usb, config.label);
+USB_strings usb_roxy_strings(roxy_usb, config.label, 0);
+USB_strings usb_iidx_strings(iidx_usb, config.label, 1);
 
 class Axis {
 	public:
@@ -311,10 +326,22 @@ int main() {
 	usb_dm.set_af(14);
 	usb_dp.set_mode(Pin::AF);
 	usb_dp.set_af(14);
-	
+
 	RCC.enable(RCC.USB);
 	
-	usb.init();
+	USB_f1* usb;
+
+	switch (config.controller_emulation)
+	{
+		case 1:
+			usb = &iidx_usb;
+			break;
+		default:
+			usb = &roxy_usb;
+			break;
+	}
+
+	usb->init();
 
 	uint32_t button_time[12];
 	bool last_state[12];
@@ -417,7 +444,7 @@ int main() {
 	uint8_t led_steps_flashing = (uint8_t)((float)(flashing_brightness_high - flashing_brightness_low) / ((float)flashing_period / (float)rgb_update_period));
 	
 	while(1) {
-		usb.process();
+		usb->process();
 		
 		uint16_t buttons = 0xfff;
 		for (int i = 0; i < 12; i++) {
@@ -516,8 +543,8 @@ int main() {
 		
 		input_report_t report = {1, buttons, uint8_t(qe1_count), uint8_t(qe2_count)};
 			
-		if(usb.ep_ready(1)) {
-			usb.write(1, (uint32_t*)&report, sizeof(report));
+		if(usb->ep_ready(1)) {
+			usb->write(1, (uint32_t*)&report, sizeof(report));
 		}
 
 		if(Time::time() - last_led_time > 1000) {
