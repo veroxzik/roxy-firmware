@@ -10,6 +10,7 @@ struct config_t {
 						// Bit 2:	Invert QE2
 						// Bit 3:	LED1 always on
 						// Bit 4:	LED2 always on	 (not used on Roxy)
+						// Bit 5:	Enable analog knobs
 	int8_t qe1_sens;
 	int8_t qe2_sens;
 	uint8_t ps2_mode;
