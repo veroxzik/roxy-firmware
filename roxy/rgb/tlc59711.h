@@ -14,18 +14,10 @@ class TLC59711 {
 	private:
 		uint8_t numdrivers;
 		uint8_t bcr, bcg, bcb;	// Brightness
-		uint16_t pwmbuffer[2 + 12 * 6];	// Command (4 byte) + array for all channels, max of 6 TLC59711 supported
+		uint16_t pwmbuffer[(2 + 12) * 7];	// Command (4 byte) + array for all channels, max of 7 TLC59711 supported
 		volatile bool busy;
 
-	public:
-		void init(uint8_t n) {
-			RCC.enable(RCC.SPI3);
-			RCC.enable(RCC.DMA2);
-
-			// Initialize variables
-			numdrivers = n;
-			bcr = bcg = bcb = 0x7F;	// Max brightness
-
+		void set_command_buffer() {
 			// Setup buffer
 			uint32_t command = 0x25;	// Magic word
 			command <<= 5;
@@ -40,6 +32,23 @@ class TLC59711 {
 
 			pwmbuffer[0] = ((command >> 16) << 8 & 0xFF00) | ((command >> 16) >> 8 & 0xFF);
 			pwmbuffer[1] = (command << 8 & 0xFF00) | (command >> 8 & 0xFF);
+
+			for (uint8_t i = 1; i < numdrivers; i++) {
+				pwmbuffer[i * 14] = pwmbuffer[0];
+				pwmbuffer[(i * 14) + 1] = pwmbuffer[1];
+			}
+		}
+
+	public:
+		void init(uint8_t n) {
+			RCC.enable(RCC.SPI3);
+			RCC.enable(RCC.DMA2);
+
+			// Initialize variables
+			numdrivers = n;
+			bcr = bcg = bcb = 0x7F;	// Max brightness
+
+			set_command_buffer();
 
 			rgb_sck.set_mode(Pin::AF);
 			rgb_sck.set_af(6);
@@ -73,7 +82,7 @@ class TLC59711 {
 
 			busy = true;
 
-			DMA2.reg.C[1].NDTR = 2 + 12 * numdrivers;
+			DMA2.reg.C[1].NDTR = (2 + 12) * numdrivers;
 			DMA2.reg.C[1].MAR = (uint32_t)&pwmbuffer;
 			DMA2.reg.C[1].PAR = (uint32_t)&SPI3.reg.DR;
 			DMA2.reg.C[1].CR = 	(1 << 10) |	// MSIZE = 16-bits
@@ -87,10 +96,11 @@ class TLC59711 {
 		}
 
 		void set_pwm(uint8_t lednum, uint8_t chan, uint16_t pwm) {
+			chan = lednum * 3 + chan;
 			if (chan > 12 * numdrivers)
 				return;
-			chan = ((numdrivers * 4) - (lednum + 1)) * 3 + chan;
-			pwmbuffer[2 + chan] = (pwm << 8 & 0xFF00) | (pwm >> 8 & 0xFF);;
+			uint8_t driverindex = (uint8_t)(lednum / 4.0f);
+			pwmbuffer[(driverindex * 14) + 2 + (chan % 12)] = (pwm << 8 & 0xFF00) | (pwm >> 8 & 0xFF);;
 		}
 
 		void set_led(uint8_t lednum, uint16_t r, uint16_t g, uint16_t b) {
@@ -111,19 +121,7 @@ class TLC59711 {
 			bcg = g > 127 ? 127 : (g < 0 ? 0 : g);
 			bcb = b > 127 ? 127 : (b < 0 ? 0 : b);
 
-			uint32_t command = 0x25;	// Magic word
-			command <<= 5;
-			// OUTTMG = 1, EXTGCK = 0, TMGRST = 1, DSPRPT = 1, BLANK = 0 -> 0x16
-			command |= 0x16;
-			command <<= 7;
-			command |= bcr;
-			command <<= 7;
-			command |= bcg;
-			command <<= 7;
-			command |= bcb;
-
-			pwmbuffer[0] = ((command >> 16) << 8 & 0xFF00) | ((command >> 16) >> 8 & 0xFF);
-			pwmbuffer[1] = (command << 8 & 0xFF00) | (command >> 8 & 0xFF);
+			set_command_buffer();
 		}
 
 		void set_brightness(uint8_t brightness) {

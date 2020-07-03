@@ -6,6 +6,14 @@
 // Copyright (c) 2013 FastLED under the MIT License
 
 #include <stdint.h>
+#include <algorithm>
+
+struct CRGB;
+struct CHSV;
+
+/// Forward declaration of hsv2rgb_rainbow here,
+/// to avoid circular dependencies.
+extern void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb);
 
 /// Representation of an HSV pixel (hue, saturation, value (aka brightness)).
 struct CHSV {
@@ -92,6 +100,42 @@ struct CRGB {
         };
 		uint8_t raw[3];
 	};
+
+    // default values are UNINITIALIZED
+	inline CRGB() __attribute__((always_inline))
+    {
+    }
+
+    /// allow construction from HSV color
+	inline CRGB(const CHSV& rhs) __attribute__((always_inline))
+    {
+        hsv2rgb_rainbow( rhs, *this);
+    }
+
+    /// allow assignment from one RGB struct to another
+	inline CRGB& operator= (const CRGB& rhs) __attribute__((always_inline))
+    {
+        r = rhs.r;
+        g = rhs.g;
+        b = rhs.b;
+        return *this;
+    }
+
+    /// allow assignment from HSV color
+	inline CRGB& operator= (const CHSV& rhs) __attribute__((always_inline))
+    {
+        hsv2rgb_rainbow( rhs, *this);
+        return *this;
+    }
+
+    /// add one RGB to another, saturating at 0xFF for each channel
+    inline CRGB& operator+= (const CRGB& rhs )
+    {
+        r = r + rhs.r > 0xFF ? 0xFF : r + rhs.r;
+        g = g + rhs.g > 0xFF ? 0xFF : g + rhs.g;
+        b = b + rhs.b > 0xFF ? 0xFF : b + rhs.b;
+        return *this;
+    }
 };
 
 #endif

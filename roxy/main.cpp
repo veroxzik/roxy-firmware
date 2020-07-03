@@ -18,6 +18,7 @@
 #include "rgb/tlc59711.h"
 #include "rgb/pixeltypes.h"
 #include "rgb/hsv2rgb.h"
+#include "rgb/sdvx_led_strip.h"
 
 static uint32_t& reset_reason = *(uint32_t*)0x10000000;
 
@@ -104,6 +105,8 @@ template <>
 void interrupt<Interrupt::DMA2_Channel2>() {
 	tlc59711.irq();
 }
+
+Sdvx_Leds sdvx_leds;	// In rgb/sdvx_led_strip.h
 
 CHSV rgb_led1, rgb_led2;
 uint32_t last_led_time;
@@ -421,7 +424,7 @@ int main() {
 			ws2812b.init();
 			break;
 		case 2:
-			tlc59711.init(1);
+			tlc59711.init(7);
 			tlc59711.set_brightness(config.rgb_brightness / 2);
 			break;
 	}
@@ -528,14 +531,18 @@ int main() {
 		
 		if(state_x > 0) {
 			buttons |= 1 << 12;
+			sdvx_leds.set_left_active(true);
 		} else if(state_x < 0) {
 			buttons |= 1 << 13;
+			sdvx_leds.set_left_active(false);
 		}
 		
 		if(state_y > 0) {
 			buttons |= 1 << 14;
+			sdvx_leds.set_right_active(true);
 		} else if(state_y < 0) {
 			buttons |= 1 << 15;
+			sdvx_leds.set_right_active(false);
 		}
 		
 		if(config.qe1_sens < 0) {
@@ -642,6 +649,17 @@ int main() {
 					}
 				}
 			}
-		}
+
+			// SDVX LED strips, only TLC59711 supported
+			if(config.rgb_mode == 2 && rgb_config.rgb_mode == 2) {
+				if(sdvx_leds.update()) {
+					for( int i = 0; i < 24; i++) {
+						CRGB temp = sdvx_leds.get_led(i);
+						tlc59711.set_led_8bit(i, temp.r, temp.b, temp.g);
+					}
+					tlc59711.schedule_dma();
+				}
+			}
+		}		
 	}
 }
