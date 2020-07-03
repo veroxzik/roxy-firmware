@@ -530,18 +530,26 @@ int main() {
 		}
 		
 		if(state_x > 0) {
-			buttons |= 1 << 12;
+			if(config.flags & (1 << 6)) {
+				buttons |= 1 << 12;
+			}
 			sdvx_leds.set_left_active(true);
 		} else if(state_x < 0) {
-			buttons |= 1 << 13;
+			if(config.flags & (1 << 6)) {
+				buttons |= 1 << 13;
+			}
 			sdvx_leds.set_left_active(false);
 		}
 		
 		if(state_y > 0) {
-			buttons |= 1 << 14;
+			if(config.flags & (1 << 6)) {
+				buttons |= 1 << 14;
+			}
 			sdvx_leds.set_right_active(true);
 		} else if(state_y < 0) {
-			buttons |= 1 << 15;
+			if(config.flags & (1 << 6)) {
+				buttons |= 1 << 15;
+			}
 			sdvx_leds.set_right_active(false);
 		}
 		
