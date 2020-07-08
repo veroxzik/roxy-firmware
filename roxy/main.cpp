@@ -426,6 +426,10 @@ int main() {
 		case 2:
 			tlc59711.init(7);
 			tlc59711.set_brightness(config.rgb_brightness / 2);
+			if(rgb_config.rgb_mode == 2) {
+				sdvx_leds.set_left_hue(rgb_config.led1_hue);
+				sdvx_leds.set_right_hue(rgb_config.led2_hue);
+			}
 			break;
 	}
 	
