@@ -18,6 +18,7 @@
 #include "rgb/tlc59711.h"
 #include "rgb/pixeltypes.h"
 #include "rgb/hsv2rgb.h"
+#include "rgb/led_breathing.h"
 #include "rgb/sdvx_led_strip.h"
 
 static uint32_t& reset_reason = *(uint32_t*)0x10000000;
@@ -107,6 +108,7 @@ void interrupt<Interrupt::DMA2_Channel2>() {
 }
 
 Sdvx_Leds sdvx_leds;	// In rgb/sdvx_led_strip.h
+Led_Breathing breathing_leds;	// In rgb/led_breathing.h
 
 CHSV rgb_led1, rgb_led2;
 uint32_t last_led_time;
@@ -189,8 +191,17 @@ class HID_arcin : public USB_HID {
 					ws2812b.update(report->r1, report->g1, report->b1);
 					break;
 				case 2:
-					tlc59711.set_led_8bit(0, report->r1, report->g1, report->b1);
-					tlc59711.set_led_8bit(1, report->r2, report->g2, report->b2);
+					switch (rgb_config.rgb_mode) {
+						case 0:
+						case 1:
+							tlc59711.set_led_8bit(2, report->r1, report->g1, report->b1);
+							tlc59711.set_led_8bit(3, report->r2, report->g2, report->b2);
+							break;
+						case 2:
+							tlc59711.set_led_8bit(26, report->r1, report->g1, report->b1);
+							tlc59711.set_led_8bit(27, report->r2, report->g2, report->b2);
+						break;
+					}
 					tlc59711.schedule_dma();
 					break;
 			}
@@ -424,8 +435,19 @@ int main() {
 			ws2812b.init();
 			break;
 		case 2:
-			tlc59711.init(7);
+			switch(rgb_config.rgb_mode) {
+				case 1:
+					tlc59711.init(1);
+					break;
+				case 2:
+					tlc59711.init(7);
+					break;
+			}
 			tlc59711.set_brightness(config.rgb_brightness / 2);
+			if(rgb_config.rgb_mode == 1) {
+				breathing_leds.set_hue(0, rgb_config.led1_hue);
+				breathing_leds.set_hue(1, rgb_config.led2_hue);
+			}
 			if(rgb_config.rgb_mode == 2) {
 				sdvx_leds.set_left_hue(rgb_config.led1_hue);
 				sdvx_leds.set_right_hue(rgb_config.led2_hue);
@@ -445,20 +467,6 @@ int main() {
 	// Number of cycles remaining before the TT buttons can swap polarities
 	const int8_t tt_switch_threshold = 20;
 
-	// RGB variables
-	uint8_t rgb_update_period = 20;		// ms, Period of updating RGB
-	uint16_t breathing_period = 2000;	// ms, Period of low breathing
-	uint8_t breathing_brightness_low = 80;		// Max 255
-	uint8_t breathing_brightness_high = 180;	// Max 255
-	uint8_t led_steps_breathing = (uint8_t)((float)(breathing_brightness_high - breathing_brightness_low) / ((float)breathing_period / (float)rgb_update_period));
-	uint8_t brightness1 = breathing_brightness_low, brightness2 = breathing_brightness_low;
-	uint8_t led1_mode = 0, led2_mode = 0;
-
-	uint16_t flashing_period = 200;		// ms, Period of flashing when a knob is turned
-	uint8_t	flashing_brightness_low = 160;
-	uint8_t flashing_brightness_high = 255;
-	uint8_t led_steps_flashing = (uint8_t)((float)(flashing_brightness_high - flashing_brightness_low) / ((float)flashing_period / (float)rgb_update_period));
-	
 	while(1) {
 		usb->process();
 		
@@ -580,98 +588,27 @@ int main() {
 				button_leds[i].set(buttons >> i & 0x1);
 			}
 
-			if(Time::time() - last_rgb_time > rgb_update_period) {
-				// If TLC59711
-				if(config.rgb_mode == 2) {
-					// If knobs react to encoders
-					if(rgb_config.rgb_mode == 1) {
-						if((state_x > 1 || state_x < -1) && (led1_mode == 0 || led1_mode == 1)) {
-							led1_mode = 2;
-							brightness1 = flashing_brightness_high - led_steps_flashing;
-						} else if(state_x == 0 && (led1_mode == 2 || led1_mode == 3)) {
-							led1_mode = 1;
-						}
-						if((state_y > 1 || state_y < -1) && (led2_mode == 0 || led2_mode == 1)) {
-							led2_mode = 2;
-							brightness2 = flashing_brightness_high - led_steps_flashing;
-						} else if(state_y == 0 && (led2_mode == 2 || led2_mode == 3)) {
-							led2_mode = 1;
-						}
-						switch(led1_mode){
-							case 0:
-								brightness1 += led_steps_breathing;
-								if(brightness1 >= breathing_brightness_high) {
-									led1_mode = 1;
-								}
-								break;
-							case 1:
-								brightness1 -= led_steps_breathing;
-								if(brightness1 <= breathing_brightness_low) {
-									led1_mode = 0;
-								}
-								break;
-							case 2:
-								brightness1 += led_steps_flashing;
-								if(brightness1 >= flashing_brightness_high) {
-									led1_mode = 3;
-								}
-								break;
-							case 3:
-								brightness1 -= led_steps_flashing;
-								if(brightness1 <= flashing_brightness_low) {
-									led1_mode = 0;
-								}
-								break;
-						}
-						switch(led2_mode){
-							case 0:
-								brightness2 += led_steps_breathing;
-								if(brightness2 >= breathing_brightness_high) {
-									led2_mode = 1;
-								}
-								break;
-							case 1:
-								brightness2 -= led_steps_breathing;
-								if(brightness2 <= breathing_brightness_low) {
-									led2_mode = 0;
-								}
-								break;
-							case 2:
-								brightness2 += led_steps_flashing;
-								if(brightness2 >= flashing_brightness_high) {
-									led2_mode = 3;
-								}
-								break;
-							case 3:
-								brightness2 -= led_steps_flashing;
-								if(brightness2 <= flashing_brightness_low) {
-									led2_mode = 0;
-								}
-								break;
-						}
-						rgb_led1 = CHSV(rgb_config.led1_hue, 255, brightness1);
-						rgb_led2 = CHSV(rgb_config.led2_hue, 255, brightness2);
-						CRGB rgb_temp1, rgb_temp2;
-						hsv2rgb_rainbow(rgb_led1, rgb_temp1);
-						tlc59711.set_led_8bit(0, rgb_temp1.r, rgb_temp1.g, rgb_temp1.b);
-						hsv2rgb_rainbow(rgb_led2, rgb_temp2);
-						tlc59711.set_led_8bit(1, rgb_temp2.r, rgb_temp2.g, rgb_temp2.b);
-						tlc59711.schedule_dma();
-						last_rgb_time = Time::time();
-					}
-				}
-			}
-
-			// SDVX LED strips, only TLC59711 supported
-			if(config.rgb_mode == 2 && rgb_config.rgb_mode == 2) {
-				if(sdvx_leds.update()) {
-					for( int i = 0; i < 24; i++) {
-						CRGB temp = sdvx_leds.get_led(i);
-						tlc59711.set_led_8bit(i, temp.r, temp.b, temp.g);
-					}
+			// Breathing LEDs, only TLC59711 supported
+			if(config.rgb_mode == 2 && rgb_config.rgb_mode == 1) {
+				if(breathing_leds.update(state_x, state_y)) {
+					CRGB temp = breathing_leds.get_led(0);
+					tlc59711.set_led_8bit(2, temp.r, temp.g, temp.b);
+					temp = breathing_leds.get_led(1);
+					tlc59711.set_led_8bit(3, temp.r, temp.g, temp.b);
 					tlc59711.schedule_dma();
 				}
 			}
-		}		
+		}	
+
+		// SDVX LED strips, only TLC59711 supported
+		if(config.rgb_mode == 2 && rgb_config.rgb_mode == 2) {
+			if(sdvx_leds.update()) {
+				for( int i = 0; i < 24; i++) {
+					CRGB temp = sdvx_leds.get_led(i);
+					tlc59711.set_led_8bit(i, temp.r, temp.b, temp.g);
+				}
+				tlc59711.schedule_dma();
+			}
+		}	
 	}
 }
