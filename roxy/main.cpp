@@ -9,6 +9,7 @@
 #include <usb/descriptor.h>
 #include <spi/spi.h>
 
+#include "board_define.h"
 #include "report_desc.h"
 #include "usb_strings.h"
 #include "configloader.h"
@@ -41,7 +42,11 @@ Configloader rgb_configloader(0x8020000);
 config_t config;
 rgb_config_t rgb_config;
 
+#if defined(ROXY)
 auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x16d0, 0x0f8b, 0x0002, 1, 2, 3, 1);
+#elif defined(ARCIN)
+auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1d50, 0x6080, 0x110, 1, 2, 3, 1);
+#endif
 auto conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
 	// HID interface.
 	interface_desc(0, 0, 1, 0x03, 0x00, 0x00, 0,
@@ -69,25 +74,25 @@ desc_t konami_conf_desc_p = {sizeof(konami_conf_desc), (void*)&konami_conf_desc}
 auto sdvx_dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1ccf, 0x101c, 0x100, 1, 2, 3, 1);
 desc_t sdvx_dev_desc_p = {sizeof(sdvx_dev_desc), (void*)&sdvx_dev_desc};
 
-static Pin usb_dm = GPIOA[11];
-static Pin usb_dp = GPIOA[12];
+// Defined in "pin_define.h"
+extern Pin usb_dm;
+extern Pin usb_dp;
+#ifdef ARCIN
+extern Pin usb_pu;
+#endif
 
-static Pin button_inputs[] = {
-  GPIOB[4], GPIOB[5], GPIOB[6], GPIOB[9], GPIOC[14], GPIOC[5],
-  GPIOB[1], GPIOB[10], GPIOC[7], GPIOC[9], GPIOA[9], GPIOB[7]};
-static Pin button_leds[] = {
-  GPIOA[15], GPIOC[11], GPIOB[3], GPIOC[13], GPIOC[15], GPIOB[0],
-  GPIOB[2], GPIOC[6], GPIOC[8], GPIOA[8], GPIOA[10], GPIOB[8]};
+extern Pin button_inputs[];
+extern Pin button_leds[];
 
-static Pin qe1a = GPIOA[0];
-static Pin qe1b = GPIOA[1];
-static Pin qe2a = GPIOA[6];
-static Pin qe2b = GPIOA[7];
+extern Pin qe1a;
+extern Pin qe1b;
+extern Pin qe2a;
+extern Pin qe2b;
 
-Pin rgb_sck = GPIOC[10];
-Pin rgb_mosi = GPIOC[12];
-
-static Pin led1 = GPIOC[4];
+extern Pin led1;
+#ifdef ARCIN
+extern Pin led2;
+#endif
 
 USB_f1 roxy_usb(USB, dev_desc_p, conf_desc_p);
 USB_f1 iidx_usb(USB, iidx_dev_desc_p, konami_conf_desc_p);
@@ -95,10 +100,17 @@ USB_f1 sdvx_usb(USB, sdvx_dev_desc_p, konami_conf_desc_p);
 
 WS2812B ws2812b;	// In rgb/ws2812b.h
 
+#if defined(ROXY)
 template <>
 void interrupt<Interrupt::DMA2_Channel1>() {
 	ws2812b.irq();
 }
+#elif defined(ARCIN)
+template <>
+void interrupt<Interrupt::DMA1_Channel7>() {
+	ws2812b.irq();
+}
+#endif
 
 TLC59711 tlc59711;	// In rgb/tlc59711.h
 
@@ -110,9 +122,7 @@ void interrupt<Interrupt::DMA2_Channel2>() {
 Sdvx_Leds sdvx_leds;	// In rgb/sdvx_led_strip.h
 Led_Breathing breathing_leds;	// In rgb/led_breathing.h
 
-CHSV rgb_led1, rgb_led2;
 uint32_t last_led_time;
-uint32_t last_rgb_time;
 
 class HID_arcin : public USB_HID {
 	private:
@@ -182,7 +192,7 @@ class HID_arcin : public USB_HID {
 			output_report_t* report = (output_report_t*)buf;
 			
 			last_led_time = Time::time();
-			for (int i = 0; i < 12; i++) {
+			for (int i = 0; i < 11; i++) {
 				button_leds[i].set((report->leds) >> i & 0x1);
 			}
 			
@@ -366,10 +376,15 @@ int main() {
 
 	usb->init();
 
+#ifdef ARCIN
+	usb_pu.set_mode(Pin::Output);
+	usb_pu.on();
+#endif
+
 	uint32_t button_time[12];
 	bool last_state[12];
 	
-	for (int i = 0; i < 12; i++) {
+	for (int i = 0; i < 11; i++) {
 		button_inputs[i].set_mode(Pin::Input);
 		button_inputs[i].set_pull(Pin::PullUp);
 		
@@ -380,16 +395,24 @@ int main() {
 	}
 	
 	led1.set_mode(Pin::Output);
-	led1.on();
+	if(config.flags & (1 << 3)) {
+		led1.on();
+	}
+#ifdef ARCIN
+	led2.set_mode(Pin::Output);
+	if(config.flags & (1 << 4)) {
+		led2.on();
+	}
+#endif
 	
-	Axis* axis_1;
+	Axis* axis[2];
 	
 	if(config.flags & (1 << 5)) {
 		RCC.enable(RCC.ADC12);
 		
 		axis_ana1.enable();
 		
-		axis_1 = &axis_ana1;
+		axis[0] = &axis_ana1;
 		
 	} else {
 		RCC.enable(RCC.TIM2);
@@ -403,17 +426,15 @@ int main() {
 		qe1a.set_pull(Pin::PullUp);
 		qe1b.set_pull(Pin::PullUp);
 		
-		axis_1 = &axis_qe1;
+		axis[0] = &axis_qe1;
 	}
-	
-	Axis* axis_2;
 	
 	if(config.flags & (1 << 5)) {
 		RCC.enable(RCC.ADC12);
 		
 		axis_ana2.enable();
 		
-		axis_2 = &axis_ana2;
+		axis[1] = &axis_ana2;
 		
 	} else {
 		RCC.enable(RCC.TIM3);
@@ -427,8 +448,10 @@ int main() {
 		qe2a.set_pull(Pin::PullUp);
 		qe2b.set_pull(Pin::PullUp);
 		
-		axis_2 = &axis_qe2;
+		axis[1] = &axis_qe2;
 	}
+
+	uint32_t axis_time[2] = {0, 0};
 	
 	switch(config.rgb_mode) {
 		case 1:
@@ -455,23 +478,23 @@ int main() {
 			break;
 	}
 	
-	uint8_t last_x = 0;
-	uint8_t last_y = 0;
-	
-	int8_t state_x = 0;
-	int8_t state_y = 0;
-
 	// Number of cycles TT buttons will turn off once no motion is detected
 	const int8_t tt_cycles = 50;
 
 	// Number of cycles remaining before the TT buttons can swap polarities
 	const int8_t tt_switch_threshold = 20;
 
+	uint8_t last_axis[2] = {0, 0};
+	int8_t state_axis[2] = {0, 0};
+	int8_t last_axis_state[2] = {0, 0};
+	uint32_t qe_count[2] = {0, 0};
+	uint32_t axis_buttons[4] = {(1 << 12), (1 << 13), (1 << 14), (1 << 15)};
+
 	while(1) {
 		usb->process();
 		
-		uint16_t buttons = 0xfff;
-		for (int i = 0; i < 12; i++) {
+		uint16_t buttons = 0x7ff;
+		for (int i = 0; i < 11; i++) {
 			bool read = button_inputs[i].get();
 			if((Time::time() - button_time[i]) >= config.debounce_time)
 			{
@@ -493,104 +516,102 @@ int main() {
 			reset();
 		}	
 		
-		uint32_t qe1_count = axis_1->get();
-		uint32_t qe2_count = axis_2->get();
-		
-		int8_t rx = qe1_count - last_x;
-		int8_t ry = qe2_count - last_y;
-		
-		if(state_x > -tt_switch_threshold && rx > 1) {
-			state_x = tt_cycles;
-			last_x = qe1_count;
-		} else if(state_x < tt_switch_threshold && rx < -1) {
-			state_x = -tt_cycles;
-			last_x = qe1_count;
-		} else if(state_x > 0) {
-			state_x--;
-			last_x = qe1_count;
-		} else if(state_x < 0) {
-			state_x++;
-			last_x = qe1_count;
-		}
+		for(int i = 0; i < 2; i++) {
+			qe_count[i] = axis[i]->get();
+			int8_t delta = qe_count[i] - last_axis[i];
 
-		if (state_x > 0 && rx > 0) {
-			state_x = tt_cycles;
-		}
-		if (state_x < 0 && rx < 0) {
-			state_x = -tt_cycles;
-		}
-		
-		if(state_y > -tt_switch_threshold && ry > 1) {
-			state_y = tt_cycles;
-			last_y = qe2_count;
-		} else if(state_y < tt_switch_threshold && ry < -1) {
-			state_y = -tt_cycles;
-			last_y = qe2_count;
-		} else if(state_y > 0) {
-			state_y--;
-			last_y = qe2_count;
-		} else if(state_y < 0) {
-			state_y++;
-			last_y = qe2_count;
-		}
+			if(state_axis[i] > -tt_switch_threshold && delta > 1) {
+				state_axis[i] = tt_cycles;
+				last_axis[i] = qe_count[i];
+				axis_time[0] = Time::time();
+			} else if(state_axis[i] < tt_switch_threshold && delta < -1) {
+				state_axis[i] = -tt_cycles;
+				last_axis[i] = qe_count[i];
+				axis_time[0] = Time::time();
+			} else if(state_axis[i] > 0) {
+				state_axis[i]--;
+				last_axis[i] = qe_count[i];
+			} else if(state_axis[i] < 0) {
+				state_axis[i]++;
+				last_axis[i] = qe_count[i];
+			}
 
-		if (state_y > 0 && ry > 0) {
-			state_y = tt_cycles;
-		}
-		if (state_y < 0 && ry < 0) {
-			state_y = -tt_cycles;
-		}
-		
-		if(state_x > 0) {
-			if(config.flags & (1 << 6)) {
-				buttons |= 1 << 12;
+			if (state_axis[i] > 0 && delta > 0) {
+				state_axis[i] = tt_cycles;
 			}
-			sdvx_leds.set_left_active(true);
-		} else if(state_x < 0) {
-			if(config.flags & (1 << 6)) {
-				buttons |= 1 << 13;
+			if (state_axis[i] < 0 && delta < 0) {
+				state_axis[i] = -tt_cycles;
 			}
-			sdvx_leds.set_left_active(false);
-		}
-		
-		if(state_y > 0) {
-			if(config.flags & (1 << 6)) {
-				buttons |= 1 << 14;
+
+			int8_t state_req = 0;
+
+			if(state_axis[i] > 0) {
+				if(config.flags & (1 << 6)) {
+					state_req = 1;
+				}
+				sdvx_leds.set_active(i, true);
+			} else if(state_axis[i] < 0) {
+				if(config.flags & (1 << 6)) {
+					state_req = -1;
+				}
+				sdvx_leds.set_active(i, false);
 			}
-			sdvx_leds.set_right_active(true);
-		} else if(state_y < 0) {
-			if(config.flags & (1 << 6)) {
-				buttons |= 1 << 15;
+
+			if(last_axis_state[i] != 0) {
+				if((Time::time() - axis_time[i]) >= config.axis_debounce_time) {
+					if(last_axis_state[i] != state_req) {
+						axis_time[i] = Time::time();
+					}
+
+					last_axis_state[i] = 0;	// Clear, let below take care of it
+				} else if(last_axis_state[i] == -state_req) {
+					// Allow the ability to change direction instantly
+					axis_time[i] = Time::time();
+					last_axis_state[i] = 0;	// Clear, let below take care of it
+				}
 			}
-			sdvx_leds.set_right_active(false);
+
+			if(last_axis_state[i] == 0 && state_req > 0) {
+				axis_time[i] = Time::time();
+				last_axis_state[i] = 1;
+			} else if(last_axis_state[i] == 0 && state_req < 0) {
+				axis_time[i] = Time::time();
+				last_axis_state[i] = -1;
+			}
+
+			if(last_axis_state[i] == 1) {
+				buttons |= axis_buttons[2 * i];
+			} else if(last_axis_state[i] == -1) {
+				buttons |= axis_buttons[2 * i + 1];
+			}
 		}
 		
 		if(config.qe1_sens < 0) {
-			qe1_count /= -config.qe1_sens;
+			qe_count[0] /= -config.qe1_sens;
 		} else if(config.qe1_sens > 0) {
-			qe1_count *= config.qe1_sens;
+			qe_count[0] *= config.qe1_sens;
 		}
 		
 		if(config.qe2_sens < 0) {
-			qe2_count /= -config.qe2_sens;
+			qe_count[1] /= -config.qe2_sens;
 		} else if(config.qe2_sens > 0) {
-			qe2_count *= config.qe2_sens;
+			qe_count[1] *= config.qe2_sens;
 		}
 		
-		input_report_t report = {1, buttons, uint8_t(qe1_count), uint8_t(qe2_count)};
+		input_report_t report = {1, buttons, uint8_t(qe_count[0]), uint8_t(qe_count[1])};
 			
 		if(usb->ep_ready(1)) {
 			usb->write(1, (uint32_t*)&report, sizeof(report));
 		}
 
 		if(Time::time() - last_led_time > 1000) {
-			for (int i = 0; i < 12; i++) {
+			for (int i = 0; i < 11; i++) {
 				button_leds[i].set(buttons >> i & 0x1);
 			}
 
 			// Breathing LEDs, only TLC59711 supported
 			if(config.rgb_mode == 2 && rgb_config.rgb_mode == 1) {
-				if(breathing_leds.update(state_x, state_y)) {
+				if(breathing_leds.update(state_axis[0], state_axis[1])) {
 					CRGB temp = breathing_leds.get_led(0);
 					tlc59711.set_led_8bit(2, temp.r, temp.g, temp.b);
 					temp = breathing_leds.get_led(1);

@@ -42,9 +42,17 @@ class Sdvx_Leds {
 
 		void set_left_active(bool dir);
 		void set_right_active(bool dir);
+		void set_active(uint8_t index, bool dir);
 
 		void set_left_hue(uint8_t col) { hue_left = col;};
 		void set_right_hue(uint8_t col) { hue_right = col;};
+		void set_hue(uint8_t index, uint8_t col) { 
+			if(index == 0) {
+				set_left_hue(col);
+			} else {
+				set_right_hue(col);
+			}
+		};
 };
 
 #endif

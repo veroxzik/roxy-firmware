@@ -8,7 +8,15 @@ SConscript('laks/build_rules')
 
 env.SelectMCU('stm32f303rc')
 
-env.Firmware('roxy.elf', Glob('roxy/*.cpp') + Glob('roxy/rgb/*.cpp'), LINK_SCRIPT = 'roxy/roxy.ld')
+arc = ARGUMENTS.get('arcin',0)
+if int(arc):
+	env.Append(CPPDEFINES = ['ARCIN'])
+	filename = 'arcin-roxy.elf'
+else:
+	env.Append(CPPDEFINES = ['ROXY'])
+	filename = 'roxy.elf'
+
+env.Firmware(filename, Glob('roxy/*.cpp') + Glob('roxy/rgb/*.cpp'), LINK_SCRIPT = 'roxy/roxy.ld')
 
 env.Firmware('bootloader.elf', Glob('bootloader/*.cpp'), LINK_SCRIPT = 'bootloader/bootloader.ld')
 

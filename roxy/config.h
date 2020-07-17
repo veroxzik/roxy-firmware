@@ -18,6 +18,7 @@ struct config_t {
 	uint8_t rgb_brightness;
 	uint8_t debounce_time;
 	uint8_t controller_emulation;
+	uint8_t axis_debounce_time;
 };
 
 #endif

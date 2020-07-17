@@ -7,8 +7,9 @@
 #include <timer/timer.h>
 #include <interrupt/interrupt.h>
 #include <os/time.h>
+#include "../board_define.h"
 
-extern Pin rgb_mosi;
+extern Pin ws_data;
 
 class WS2812B {
 	private:
@@ -19,6 +20,7 @@ class WS2812B {
 		void schedule_dma() {
 			cnt--;
 			
+#if defined(ROXY)
 			DMA2.reg.C[0].NDTR = 26;
 			DMA2.reg.C[0].MAR = (uint32_t)&dmabuf;
 			DMA2.reg.C[0].PAR = (uint32_t)&TIM8.CCR3;
@@ -29,6 +31,12 @@ class WS2812B {
 								(1 << 4) | 	// Direction: read from memory
 								(1 << 1) | 	// Transfer complete interrupt enable
 								(1 << 0);	// Channel enable
+#elif defined(ARCIN)
+			DMA1.reg.C[6].NDTR = 26;
+			DMA1.reg.C[6].MAR = (uint32_t)&dmabuf;
+			DMA1.reg.C[6].PAR = (uint32_t)&TIM4.CCR3;
+			DMA1.reg.C[6].CR = (0 << 10) | (1 << 8) | (1 << 7) | (0 << 6) | (1 << 4) | (1 << 1) | (1 << 0);
+#endif
 		}
 		
 		void set_color(uint8_t r, uint8_t g, uint8_t b) {
@@ -54,6 +62,7 @@ class WS2812B {
 		
 	public:
 		void init() {
+#if defined(ROXY)
 			RCC.enable(RCC.TIM8);
 			RCC.enable(RCC.DMA2);
 			
@@ -67,12 +76,31 @@ class WS2812B {
 			TIM8.DIER = 1 << 8;		// Update DMA request enable
 			TIM8.BDTR = 1 << 15;	// Main output enable
 			
-			rgb_mosi.set_af(4);
-			rgb_mosi.set_mode(Pin::AF);
-			rgb_mosi.set_pull(Pin::PullNone);
+			ws_data.set_af(4);
+			ws_data.set_mode(Pin::AF);
+			ws_data.set_pull(Pin::PullNone);
 			
 			TIM8.CR1 = 1 << 0;
+#elif defined(ARCIN)
+			RCC.enable(RCC.TIM4);
+			RCC.enable(RCC.DMA1);
 			
+			Interrupt::enable(Interrupt::DMA1_Channel7);
+			
+			TIM4.ARR = (72000000 / 800000) - 1; // period = 90, 0 = 29, 1 = 58
+			TIM4.CCR3 = 0;
+			
+			TIM4.CCMR2 = (6 << 4) | (1 << 3);
+			TIM4.CCER = 1 << 8;
+			TIM4.DIER = 1 << 8;
+			
+			ws_data.set_af(2);
+			ws_data.set_mode(Pin::AF);
+			ws_data.set_pull(Pin::PullNone);
+			
+			TIM4.CR1 = 1 << 0;
+#endif
+
 			Time::sleep(1);
 			
 			update(0, 0, 0);
@@ -81,15 +109,20 @@ class WS2812B {
 		void update(uint8_t r, uint8_t g, uint8_t b) {
 			set_color(r, g, b);
 			
-			cnt = 15;
+			cnt = 24;
 			busy = true;
 			
 			schedule_dma();
 		}
 		
 		void irq() {
+#if defined(ROXY)
 			DMA2.reg.C[0].CR = 0;
 			DMA2.reg.IFCR = 1 << 0;
+#elif defined(ARCIN)
+			DMA1.reg.C[6].CR = 0;
+			DMA1.reg.IFCR = 1 << 24;
+#endif
 			
 			if(cnt) {
 				schedule_dma();

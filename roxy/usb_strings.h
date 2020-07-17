@@ -2,6 +2,10 @@
 #define USB_STRINGS_H
 
 #include <usb/usb.h>
+#include "board_define.h"
+
+extern const char16_t mfg_name[];
+extern const char product_name[];
 
 uint32_t serial_num() {
 	uint32_t* uid = (uint32_t*)0x1ffff7ac;
@@ -36,7 +40,7 @@ class USB_strings : public USB_class_driver {
 					case 1:
 						switch(emulation) {
 							case 0:
-								desc = u"\u0312VeroxZik";
+								desc = mfg_name;
 								break;
 							case 1:
 							case 2:
@@ -48,7 +52,7 @@ class USB_strings : public USB_class_driver {
 					case 2:
 						switch(emulation) {
 							case 0:
-								for(const char* p = "Roxy"; *p; p++) {
+								for(const char* p = product_name; *p; p++) {
 									buf[i++] = *p;
 								}
 								

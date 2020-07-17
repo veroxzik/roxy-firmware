@@ -83,3 +83,11 @@ void Sdvx_Leds::set_right_active(bool dir) {
 	else if(burst_pos_right < 0)
 		burst_pos_right = SDVX_NUM_LEDS - 1;
 }
+
+void Sdvx_Leds::set_active(uint8_t index, bool dir) {
+	if(index == 0) {
+		set_left_active(dir);
+	} else {
+		set_right_active(dir);
+	}
+}
