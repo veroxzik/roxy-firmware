@@ -6,6 +6,8 @@
 #include <gpio/gpio.h>
 #include <spi/spi.h>
 
+#include <cmath>
+
 extern Pin rgb_sck;
 extern Pin rgb_mosi;
 
@@ -99,7 +101,7 @@ class TLC59711 {
 			chan = lednum * 3 + chan;
 			if (chan > 12 * numdrivers)
 				return;
-			uint8_t driverindex = (uint8_t)(lednum / 4.0f);
+			uint8_t driverindex = lednum / 4;
 			pwmbuffer[(driverindex * 14) + 2 + (chan % 12)] = (pwm << 8 & 0xFF00) | (pwm >> 8 & 0xFF);;
 		}
 

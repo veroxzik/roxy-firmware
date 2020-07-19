@@ -192,7 +192,7 @@ class HID_arcin : public USB_HID {
 			output_report_t* report = (output_report_t*)buf;
 			
 			last_led_time = Time::time();
-			for (int i = 0; i < 11; i++) {
+			for (int i = 0; i < NUM_BUTTONS; i++) {
 				button_leds[i].set((report->leds) >> i & 0x1);
 			}
 			
@@ -204,12 +204,12 @@ class HID_arcin : public USB_HID {
 					switch (rgb_config.rgb_mode) {
 						case 0:
 						case 1:
-							tlc59711.set_led_8bit(2, report->r1, report->g1, report->b1);
-							tlc59711.set_led_8bit(3, report->r2, report->g2, report->b2);
+							tlc59711.set_led_8bit(3, report->r1, report->g1, report->b1);
+							tlc59711.set_led_8bit(2, report->r2, report->g2, report->b2);
 							break;
 						case 2:
-							tlc59711.set_led_8bit(26, report->r1, report->g1, report->b1);
-							tlc59711.set_led_8bit(27, report->r2, report->g2, report->b2);
+							tlc59711.set_led_8bit(27, report->r1, report->g1, report->b1);
+							tlc59711.set_led_8bit(26, report->r2, report->g2, report->b2);
 						break;
 					}
 					tlc59711.schedule_dma();
@@ -384,7 +384,7 @@ int main() {
 	uint32_t button_time[12];
 	bool last_state[12];
 	
-	for (int i = 0; i < 11; i++) {
+	for (int i = 0; i < NUM_BUTTONS; i++) {
 		button_inputs[i].set_mode(Pin::Input);
 		button_inputs[i].set_pull(Pin::PullUp);
 		
@@ -493,8 +493,12 @@ int main() {
 	while(1) {
 		usb->process();
 		
+#ifdef ARCIN
 		uint16_t buttons = 0x7ff;
-		for (int i = 0; i < 11; i++) {
+#else
+		uint16_t buttons = 0xfff;
+#endif
+		for (int i = 0; i < NUM_BUTTONS; i++) {
 			bool read = button_inputs[i].get();
 			if((Time::time() - button_time[i]) >= config.debounce_time)
 			{
@@ -605,7 +609,7 @@ int main() {
 		}
 
 		if(Time::time() - last_led_time > 1000) {
-			for (int i = 0; i < 11; i++) {
+			for (int i = 0; i < NUM_BUTTONS; i++) {
 				button_leds[i].set(buttons >> i & 0x1);
 			}
 
@@ -613,9 +617,9 @@ int main() {
 			if(config.rgb_mode == 2 && rgb_config.rgb_mode == 1) {
 				if(breathing_leds.update(state_axis[0], state_axis[1])) {
 					CRGB temp = breathing_leds.get_led(0);
-					tlc59711.set_led_8bit(2, temp.r, temp.g, temp.b);
-					temp = breathing_leds.get_led(1);
 					tlc59711.set_led_8bit(3, temp.r, temp.g, temp.b);
+					temp = breathing_leds.get_led(1);
+					tlc59711.set_led_8bit(2, temp.r, temp.g, temp.b);
 					tlc59711.schedule_dma();
 				}
 			}
@@ -626,7 +630,7 @@ int main() {
 			if(sdvx_leds.update()) {
 				for( int i = 0; i < 24; i++) {
 					CRGB temp = sdvx_leds.get_led(i);
-					tlc59711.set_led_8bit(i, temp.r, temp.b, temp.g);
+					tlc59711.set_led_8bit(i, temp.b, temp.r, temp.g);
 				}
 				tlc59711.schedule_dma();
 			}

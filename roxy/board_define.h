@@ -28,6 +28,8 @@ Pin led1 = GPIOC[4];
 const char16_t mfg_name[] = u"\u0312VeroxZik";
 const char product_name[] = "Roxy";
 
+#define NUM_BUTTONS 12
+
 #elif defined(ARCIN)
 
 Pin usb_dm = GPIOA[11];
@@ -57,6 +59,8 @@ Pin led2 = GPIOA[9];
 
 const char16_t mfg_name[] = u"\u0308zyp";
 const char product_name[] = "arcin (Roxy fw)";
+
+#define NUM_BUTTONS 11
 
 #else
 #error "Board not defined."
