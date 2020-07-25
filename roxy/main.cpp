@@ -281,9 +281,13 @@ class QEAxis : public Axis {
 			tim.CR1 = 1;
 			
 			if(sens < 0) {
-				// Special case for 600 PPR
+				// Special cases
 				if(sens == -127) {
-					tim.ARR = 2400 - 1;
+					tim.ARR = (600 * 4) - 1;
+				} else if(sens == -126) {
+					tim.ARR = (400 * 4) - 1;
+				} else if(sens == -125) {
+					tim.ARR = (360 * 4) - 1;
 				} else {
 					tim.ARR = 256 * -sens - 1;
 				}
@@ -422,7 +426,7 @@ int main() {
 	} else {
 		RCC.enable(RCC.TIM2);
 		
-		axis_qe1.enable(config.flags & (1 << 1), config.qe1_sens);
+		axis_qe1.enable(config.flags & (1 << 1), config.qe_sens[0]);
 		
 		qe1a.set_af(1);
 		qe1b.set_af(1);
@@ -444,7 +448,7 @@ int main() {
 	} else {
 		RCC.enable(RCC.TIM3);
 		
-		axis_qe2.enable(config.flags & (1 << 2), config.qe2_sens);
+		axis_qe2.enable(config.flags & (1 << 2), config.qe_sens[1]);
 		
 		qe2a.set_af(2);
 		qe2b.set_af(2);
@@ -593,22 +597,18 @@ int main() {
 			} else if(last_axis_state[i] == -1) {
 				buttons |= axis_buttons[2 * i + 1];
 			}
-		}
-		
-		if(config.qe1_sens == -127) {
-			qe_count[0] *= (256.0f / 2400.0f);
-		} else if(config.qe1_sens < 0) {
-			qe_count[0] /= -config.qe1_sens;
-		} else if(config.qe1_sens > 0) {
-			qe_count[0] *= config.qe1_sens;
-		}
-		
-		if(config.qe2_sens == -127) {
-			qe_count[1] *= (256.0f / 2400.0f);
-		} else if(config.qe2_sens < 0) {
-			qe_count[1] /= -config.qe2_sens;
-		} else if(config.qe2_sens > 0) {
-			qe_count[1] *= config.qe2_sens;
+
+			if(config.qe_sens[i] == -127) {
+				qe_count[i] *= (256.0f / (600.0f * 4.0f));
+			} else if(config.qe_sens[i] == -126) {
+				qe_count[i] *= (256.0f / (400.0f * 4.0f));
+			} else if(config.qe_sens[i] == -125) {
+				qe_count[i] *= (256.0f / (360.0f * 4.0f));
+			} else if(config.qe_sens[i] < 0) {
+				qe_count[i] /= -config.qe_sens[i];
+			} else if(config.qe_sens[i] > 0) {
+				qe_count[i] *= config.qe_sens[i];
+			}
 		}
 		
 		input_report_t report = {1, buttons, uint8_t(qe_count[0]), uint8_t(qe_count[1])};
