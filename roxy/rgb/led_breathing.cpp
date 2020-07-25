@@ -43,7 +43,7 @@ bool Led_Breathing::update(int8_t state0, int8_t state1) {
 				}
 				break;
 		}
-		leds[i] = CHSV(led_hue[i], 255, led_brightness[i]);
+		leds[i] = CHSV(led_hue[i], led_hue[i] == 255 ? 0 : 255, led_brightness[i]);
 	}
 
 	last_update = Time::time();

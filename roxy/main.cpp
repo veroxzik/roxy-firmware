@@ -281,7 +281,12 @@ class QEAxis : public Axis {
 			tim.CR1 = 1;
 			
 			if(sens < 0) {
-				tim.ARR = 256 * -sens - 1;
+				// Special case for 600 PPR
+				if(sens == -127) {
+					tim.ARR = 2400 - 1;
+				} else {
+					tim.ARR = 256 * -sens - 1;
+				}
 			} else {
 				tim.ARR = 256 - 1;
 			}
@@ -590,13 +595,17 @@ int main() {
 			}
 		}
 		
-		if(config.qe1_sens < 0) {
+		if(config.qe1_sens == -127) {
+			qe_count[0] *= (256.0f / 2400.0f);
+		} else if(config.qe1_sens < 0) {
 			qe_count[0] /= -config.qe1_sens;
 		} else if(config.qe1_sens > 0) {
 			qe_count[0] *= config.qe1_sens;
 		}
 		
-		if(config.qe2_sens < 0) {
+		if(config.qe2_sens == -127) {
+			qe_count[1] *= (256.0f / 2400.0f);
+		} else if(config.qe2_sens < 0) {
 			qe_count[1] /= -config.qe2_sens;
 		} else if(config.qe2_sens > 0) {
 			qe_count[1] *= config.qe2_sens;
