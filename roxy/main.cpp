@@ -609,6 +609,7 @@ int main() {
 			} else if(config.qe_sens[i] > 0) {
 				qe_count[i] *= config.qe_sens[i];
 			}
+			qe_count[i] -= 128;
 		}
 		
 		input_report_t report = {1, buttons, uint8_t(qe_count[0]), uint8_t(qe_count[1])};
