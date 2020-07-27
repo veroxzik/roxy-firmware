@@ -12,6 +12,7 @@ struct config_t {
 						// Bit 4:	LED2 always on	 (not used on Roxy)
 						// Bit 5:	Enable analog knobs
 						// Bit 6:	Enable buttons for the axes
+						// Bit 7:	Invert light signals (always on, press or HID turns them off)
 	int8_t qe_sens[2];
 	uint8_t ps2_mode;
 	uint8_t rgb_mode;

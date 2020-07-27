@@ -211,7 +211,7 @@ class HID_arcin : public USB_HID {
 			
 			last_led_time = Time::time();
 			for (int i = 0; i < NUM_BUTTONS; i++) {
-				button_leds[i].set((report->leds) >> i & 0x1);
+				button_leds[i].set(((report->leds) >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
 			}
 			
 			switch (config.rgb_mode) {
@@ -706,7 +706,7 @@ int main() {
 
 		if(Time::time() - last_led_time > 1000) {
 			for (int i = 0; i < NUM_BUTTONS; i++) {
-				button_leds[i].set(buttons >> i & 0x1);
+				button_leds[i].set((buttons >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
 			}
 
 			// Breathing LEDs, only TLC59711 supported
