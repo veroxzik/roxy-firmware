@@ -36,3 +36,7 @@ All rights reserved.
 Selected code and methods from [FastLED]
 (https://github.com/FastLED/FastLED), released under the MIT license  
 Copyright (c) 2013 FastLED
+
+NKRO Descriptor and Code from [Dawnmist](https://dawnmist.dreamwidth.org/1250.html)
+
+Inverted Button Lights inspired by [CrazyRedMachine](https://github.com/CrazyRedMachine/UltimatePopnController)
