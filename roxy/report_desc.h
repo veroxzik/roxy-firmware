@@ -242,6 +242,28 @@ auto report_desc = joystick(
 	feature(0x02) // Config data
 );
 
+auto keyboard_report_desc = keyboard(
+	// Modifiers
+	report_size(1),
+	report_count(8),
+	usage_page(DesktopUsage::KeyCodes),
+	usage_minimum(224),
+	usage_maximum(231),
+	logical_minimum(0),
+	logical_maximum(1),
+	input(0x02),
+
+	// Keys
+	report_size(1),
+	report_count(31 * 8),
+	logical_minimum(0),
+	logical_maximum(1),
+	usage_page(DesktopUsage::KeyCodes),
+	usage_minimum(0),
+	usage_maximum(31 * 8 - 1),
+	input(0x02)
+);
+
 struct input_report_t {
 	uint8_t report_id;
 	uint16_t buttons;

@@ -38,26 +38,34 @@ void reset_bootloader() {
 
 Configloader configloader(0x801f800);
 Configloader rgb_configloader(0x8020000);
+Configloader mapping_configloader(0x8020800);
 
 config_t config;
 rgb_config_t rgb_config;
+mapping_config_t mapping_config;
 
 #if defined(ROXY)
 auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x16d0, 0x0f8b, 0x0002, 1, 2, 3, 1);
 #elif defined(ARCIN)
 auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1d50, 0x6080, 0x110, 1, 2, 3, 1);
 #endif
-auto conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
+auto conf_desc = configuration_desc(2, 1, 0, 0xc0, 0,
 	// HID interface.
 	interface_desc(0, 0, 1, 0x03, 0x00, 0x00, 0,
 		hid_desc(0x111, 0, 1, 0x22, sizeof(report_desc)),
 		endpoint_desc(0x81, 0x03, 16, 1)
+	),
+	// Keyboard interface
+	interface_desc(1, 0, 1, 0x03, 0x00, 0x00, 0,
+		hid_desc(0x111, 0, 1, 0x22, sizeof(keyboard_report_desc)),
+		endpoint_desc(0x82, 0x03, 32, 1)
 	)
 );
 
 desc_t dev_desc_p = {sizeof(dev_desc), (void*)&dev_desc};
 desc_t conf_desc_p = {sizeof(conf_desc), (void*)&conf_desc};
 desc_t report_desc_p = {sizeof(report_desc), (void*)&report_desc};
+desc_t keyboard_desc_p = {sizeof(keyboard_report_desc), (void*)&keyboard_report_desc};
 
 auto iidx_dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1ccf, 0x8048, 0x100, 1, 2, 3, 1);
 auto konami_conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
@@ -151,6 +159,8 @@ class HID_arcin : public USB_HID {
 				configloader.write(report->size, report->data);
 			} else if(report->segment == 1) {
 				rgb_configloader.write(report->size, report->data);
+			} else if(report->segment == 2) {
+				mapping_configloader.write(report->size, report->data);
 			} else {
 				return false;
 			}
@@ -167,12 +177,20 @@ class HID_arcin : public USB_HID {
 				usb.write(0, (uint32_t*)&report, sizeof(report));
 
 				config_id = 1;
-			} else {
+			} else if(config_id == 1) {
 				config_report_t rgb_report = {0xc0, 1, sizeof(rgb_config)};
 
 				memcpy(rgb_report.data, &rgb_config, sizeof(rgb_config));
 				
 				usb.write(0, (uint32_t*)&rgb_report, sizeof(rgb_report));
+
+				config_id = 2;
+			} else {
+				config_report_t mapping_report = {0xc0, 2, sizeof(mapping_config)};
+
+				memcpy(mapping_report.data, &mapping_config, sizeof(mapping_config));
+
+				usb.write(0, (uint32_t*)&mapping_report, sizeof(mapping_report));
 
 				config_id = 0;
 			}
@@ -251,6 +269,11 @@ class HID_arcin : public USB_HID {
 		}
 };
 
+class HID_keyboard : public USB_HID {
+	public:
+		HID_keyboard(USB_generic& usbd, desc_t rdesc) : USB_HID(usbd, rdesc, 1, 2, 64) {}
+};
+
 HID_arcin usb_roxy_hid(roxy_usb, report_desc_p);
 HID_arcin usb_iidx_hid(iidx_usb, report_desc_p);
 HID_arcin usb_sdvx_hid(sdvx_usb, report_desc_p);
@@ -258,6 +281,8 @@ HID_arcin usb_sdvx_hid(sdvx_usb, report_desc_p);
 USB_strings usb_roxy_strings(roxy_usb, config.label, 0);
 USB_strings usb_iidx_strings(iidx_usb, config.label, 1);
 USB_strings usb_sdvx_strings(sdvx_usb, config.label, 2);
+
+HID_keyboard usb_keyboard(roxy_usb, keyboard_desc_p);
 
 class Axis {
 	public:
@@ -343,6 +368,46 @@ class AnalogAxis : public Axis {
 AnalogAxis axis_ana1(ADC1, 2);
 AnalogAxis axis_ana2(ADC2, 4);
 
+class NKRO_Keyboard {
+	private:
+		uint8_t nkro_report[32];
+
+	public:
+		void reset_keys() {
+			for(uint8_t i = 0; i < 32; i++) {
+				nkro_report[i] = 0;
+			}
+		}
+
+		void reset_key(uint8_t keycode) {
+			uint8_t bit = keycode % 8;
+			uint8_t byte = (keycode / 8) + 1;
+
+			if(keycode >= 240 && keycode <= 247) {
+				nkro_report[0] &= ~(1 << bit);
+			} else if(byte > 0 && byte <= 31) {
+				nkro_report[byte] &= ~(1 << bit);
+			}
+		}
+
+		void set_key(uint8_t keycode) {
+			uint8_t bit = keycode % 8;
+			uint8_t byte = (keycode / 8) + 1;
+
+			if(keycode >= 240 && keycode <= 247) {
+				nkro_report[0] |= (1 << bit);
+			} else if(byte > 0 && byte <= 31) {
+				nkro_report[byte] |= (1 << bit);
+			}
+		}
+
+		uint8_t* get_data() {
+			return nkro_report;
+		}
+};
+
+NKRO_Keyboard nkro;
+
 int main() {
 	rcc_init();
 	
@@ -356,6 +421,7 @@ int main() {
 	// Load config.
 	configloader.read(sizeof(config), &config);
 	rgb_configloader.read(sizeof(rgb_config), &rgb_config);
+	mapping_configloader.read(sizeof(mapping_config), &mapping_config);
 	
 	RCC.enable(RCC.GPIOA);
 	RCC.enable(RCC.GPIOB);
@@ -536,11 +602,11 @@ int main() {
 			if(state_axis[i] > -tt_switch_threshold && delta > 1) {
 				state_axis[i] = tt_cycles;
 				last_axis[i] = qe_count[i];
-				axis_time[0] = Time::time();
+				axis_time[i] = Time::time();
 			} else if(state_axis[i] < tt_switch_threshold && delta < -1) {
 				state_axis[i] = -tt_cycles;
 				last_axis[i] = qe_count[i];
-				axis_time[0] = Time::time();
+				axis_time[i] = Time::time();
 			} else if(state_axis[i] > 0) {
 				state_axis[i]--;
 				last_axis[i] = qe_count[i];
@@ -559,14 +625,10 @@ int main() {
 			int8_t state_req = 0;
 
 			if(state_axis[i] > 0) {
-				if(config.flags & (1 << 6)) {
-					state_req = 1;
-				}
+				state_req = 1;
 				sdvx_leds.set_active(i, true);
 			} else if(state_axis[i] < 0) {
-				if(config.flags & (1 << 6)) {
-					state_req = -1;
-				}
+				state_req = -1;
 				sdvx_leds.set_active(i, false);
 			}
 
@@ -575,7 +637,6 @@ int main() {
 					if(last_axis_state[i] != state_req) {
 						axis_time[i] = Time::time();
 					}
-
 					last_axis_state[i] = 0;	// Clear, let below take care of it
 				} else if(last_axis_state[i] == -state_req) {
 					// Allow the ability to change direction instantly
@@ -592,9 +653,9 @@ int main() {
 				last_axis_state[i] = -1;
 			}
 
-			if(last_axis_state[i] == 1) {
+			if(last_axis_state[i] == 1 && config.flags & (1 << 6)) {
 				buttons |= axis_buttons[2 * i];
-			} else if(last_axis_state[i] == -1) {
+			} else if(last_axis_state[i] == -1 && config.flags & (1 << 6)) {
 				buttons |= axis_buttons[2 * i + 1];
 			}
 
@@ -614,8 +675,33 @@ int main() {
 		
 		input_report_t report = {1, buttons, uint8_t(qe_count[0]), uint8_t(qe_count[1])};
 			
-		if(usb->ep_ready(1)) {
+		// Joystick
+		if(usb->ep_ready(1) && (config.output_mode == 0 || config.output_mode == 2)) {
 			usb->write(1, (uint32_t*)&report, sizeof(report));
+		}
+
+		// Keyboard
+		if(usb->ep_ready(2) && (config.output_mode == 1 || config.output_mode == 2)) {
+			for (int i = 0; i < NUM_BUTTONS; i++) {
+				if (buttons & (1 << i) && mapping_config.button_kb_map[i] > 0) {
+					nkro.set_key(mapping_config.button_kb_map[i]);
+				} else {
+					nkro.reset_key(mapping_config.button_kb_map[i]);
+				}
+			}
+			for (int i = 0; i < 2; i++) {
+				if (last_axis_state[i] == 1 && mapping_config.axes_kb_map[2 * i] > 0) {
+					nkro.set_key(mapping_config.axes_kb_map[2 * i]);
+				} else {
+					nkro.reset_key(mapping_config.axes_kb_map[2 * i]);
+				}
+				if (last_axis_state[i] == -1 && mapping_config.axes_kb_map[2 * i + 1] > 0) {
+					nkro.set_key(mapping_config.axes_kb_map[2 * i + 1]);
+				} else {
+					nkro.reset_key(mapping_config.axes_kb_map[2 * i + 1]);
+				}
+			}
+			usb->write(2, (uint32_t*)nkro.get_data(), 32);
 		}
 
 		if(Time::time() - last_led_time > 1000) {

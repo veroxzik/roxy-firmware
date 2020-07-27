@@ -11,6 +11,7 @@ struct config_t {
 						// Bit 3:	LED1 always on
 						// Bit 4:	LED2 always on	 (not used on Roxy)
 						// Bit 5:	Enable analog knobs
+						// Bit 6:	Enable buttons for the axes
 	int8_t qe_sens[2];
 	uint8_t ps2_mode;
 	uint8_t rgb_mode;
@@ -18,6 +19,14 @@ struct config_t {
 	uint8_t debounce_time;
 	uint8_t controller_emulation;
 	uint8_t axis_debounce_time;
+	uint8_t output_mode;	// 0: Joystick only
+							// 1: Keyboard only
+							// 2: Joystick + Keyboard
+};
+
+struct mapping_config_t {
+	uint8_t button_kb_map[12];	// Keycodes for each button
+	uint8_t axes_kb_map[4];		// Keycodes for the axes (Overrides Flag bit 6)
 };
 
 #endif
