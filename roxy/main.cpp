@@ -8,6 +8,8 @@
 #include <usb/usb.h>
 #include <usb/descriptor.h>
 #include <spi/spi.h>
+#include <syscfg/syscfg.h>
+#include <interrupt/exti.h>
 
 #include "board_define.h"
 #include "report_desc.h"
@@ -289,6 +291,15 @@ class Axis {
 		virtual uint32_t get() = 0;
 };
 
+class NullAxis : public Axis {
+	public:
+		virtual uint32_t get() final {
+			return 0;
+		}
+};
+
+NullAxis null_axis;
+
 class QEAxis : public Axis {
 	private:
 		TIM_t& tim;
@@ -328,6 +339,100 @@ class QEAxis : public Axis {
 
 QEAxis axis_qe1(TIM2);
 QEAxis axis_qe2(TIM3);
+
+// This class inspired heavily by mon's Pocket Voltex, which was adapted from Encoder.h by PRJC
+// https://github.com/mon/PocketVoltex
+class IntAxis : public Axis {
+	private:
+		Pin& a, b;
+		uint32_t count = 0;
+		uint32_t max = 255;
+		uint8_t state;
+
+		bool invert = false;
+
+	public:
+		IntAxis(Pin &_a, Pin &_b) : a(_a), b(_b) {}
+
+		void enable(bool _invert, int8_t sens) {
+			invert = _invert;
+
+			if(sens < 0) {
+				if(sens == -127) {
+					max = (600 * 4) - 1;
+				} else if(sens == -126) {
+					max = (400 * 4) - 1;
+				} else if(sens == -125) {
+					max = (360 * 4) - 1;
+				} else {
+					max = 256 * -sens - 1;
+				}
+			} else {
+				sens = 256 - 1;
+			}
+
+			state = a.get() | (b.get() << 1);
+		}
+
+		void updateEncoder() {
+			uint8_t newState = a.get() | (b.get() << 1);
+			int8_t delta;
+			uint8_t tempState = state | (newState << 2);
+			state = newState;
+			switch (tempState) {
+				case 1:
+				case 7:
+				case 8:
+				case 14:
+					delta = 1;
+					break;
+				case 2:
+				case 4:
+				case 11:
+				case 13:
+					delta = -1;
+					break;
+				case 3:
+				case 12:
+					delta = 2;
+					break;
+				case 6:
+				case 9:
+					delta = -2;
+					break;
+			}
+			if(((int16_t)count + delta) < 0) {
+				count += max;
+			}
+			count += delta;
+			if(count >= max) {
+				count -= max;
+			}
+
+		}
+
+		virtual uint32_t get() final {
+			return count;
+		}
+};
+
+IntAxis axis_int(qe1b, qe2b);
+
+template<>
+void interrupt<Interrupt::EXTI1>() {
+	if(EXTI.PR1 & (1 << 1)) {
+		EXTI.PR1 |= (1 << 1);	// Clear flag
+		axis_int.updateEncoder();
+	}
+}
+
+template<>
+void interrupt<Interrupt::EXTI9_5>() {
+	if(EXTI.PR1 & (1 <<7 )) {
+		EXTI.PR1 |= (1 << 7);	// Clear flag
+		axis_int.updateEncoder();
+	}
+}
 
 class AnalogAxis : public Axis {
 	private:
@@ -482,48 +587,68 @@ int main() {
 	
 	Axis* axis[2];
 	
-	if(config.flags & (1 << 5)) {
-		RCC.enable(RCC.ADC12);
-		
-		axis_ana1.enable();
-		
-		axis[0] = &axis_ana1;
-		
-	} else {
-		RCC.enable(RCC.TIM2);
-		
-		axis_qe1.enable(config.flags & (1 << 1), config.qe_sens[0]);
-		
-		qe1a.set_af(1);
-		qe1b.set_af(1);
-		qe1a.set_mode(Pin::AF);
-		qe1b.set_mode(Pin::AF);
-		qe1a.set_pull(Pin::PullUp);
+	if(config.flags & (1 << 8)) {
+		// Setup interrupts on pins PA1 and PA7
+		RCC.enable(RCC.SYSCFG);	// Enable SYSCFG
+		// No need to set SYSCFG_EXTICR since we're using PA
+		EXTI.IMR1 |= (1 << 1) | (1 << 7); 		// Enable interrupts EXT1 and EXT7
+		EXTI.RTSR1 |= (1 << 1) | (1 << 7);		// Enable rising edge trigger on EXT1 and EXT7
+		EXTI.FTSR1 |= (1 << 1) | (1 << 7);		// Enable falling edge trigger on EXT1 and EXT7
+		Interrupt::enable(Interrupt::EXTI1);		// Enable EXTI1 interrupt
+		Interrupt::enable(Interrupt::EXTI9_5);	// Enable EXTI5-9 interrupt
+		qe1b.set_mode(Pin::Input);
+		qe2b.set_mode(Pin::Input);
 		qe1b.set_pull(Pin::PullUp);
-		
-		axis[0] = &axis_qe1;
-	}
-	
-	if(config.flags & (1 << 5)) {
-		RCC.enable(RCC.ADC12);
-		
-		axis_ana2.enable();
-		
-		axis[1] = &axis_ana2;
-		
-	} else {
-		RCC.enable(RCC.TIM3);
-		
-		axis_qe2.enable(config.flags & (1 << 2), config.qe_sens[1]);
-		
-		qe2a.set_af(2);
-		qe2b.set_af(2);
-		qe2a.set_mode(Pin::AF);
-		qe2b.set_mode(Pin::AF);
-		qe2a.set_pull(Pin::PullUp);
 		qe2b.set_pull(Pin::PullUp);
+
+		axis_int.enable(config.flags & (1 << 1), config.qe_sens[0]);
 		
-		axis[1] = &axis_qe2;
+		axis[0] = &axis_int;
+		axis[1] = &null_axis;
+	} else {
+		if(config.flags & (1 << 5)) {
+			RCC.enable(RCC.ADC12);
+			
+			axis_ana1.enable();
+			
+			axis[0] = &axis_ana1;
+			
+		} else {
+			RCC.enable(RCC.TIM2);
+			
+			axis_qe1.enable(config.flags & (1 << 1), config.qe_sens[0]);
+			
+			qe1a.set_af(1);
+			qe1b.set_af(1);
+			qe1a.set_mode(Pin::AF);
+			qe1b.set_mode(Pin::AF);
+			qe1a.set_pull(Pin::PullUp);
+			qe1b.set_pull(Pin::PullUp);
+			
+			axis[0] = &axis_qe1;
+		}
+		
+		if(config.flags & (1 << 5)) {
+			RCC.enable(RCC.ADC12);
+			
+			axis_ana2.enable();
+			
+			axis[1] = &axis_ana2;
+			
+		} else {
+			RCC.enable(RCC.TIM3);
+			
+			axis_qe2.enable(config.flags & (1 << 2), config.qe_sens[1]);
+			
+			qe2a.set_af(2);
+			qe2b.set_af(2);
+			qe2a.set_mode(Pin::AF);
+			qe2b.set_mode(Pin::AF);
+			qe2a.set_pull(Pin::PullUp);
+			qe2b.set_pull(Pin::PullUp);
+			
+			axis[1] = &axis_qe2;
+		}
 	}
 
 	uint32_t axis_time[2] = {0, 0};

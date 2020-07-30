@@ -40,3 +40,5 @@ Copyright (c) 2013 FastLED
 NKRO Descriptor and Code from [Dawnmist](https://dawnmist.dreamwidth.org/1250.html)
 
 Inverted Button Lights inspired by [CrazyRedMachine](https://github.com/CrazyRedMachine/UltimatePopnController)
+
+Encoder routine heavily referenced from [mon's Pocket Voltex](https://github.com/mon/PocketVoltex) and [Paul Stoffregen's Encoder Class](https://github.com/PaulStoffregen/Encoder)

@@ -13,6 +13,7 @@ struct config_t {
 						// Bit 5:	Enable analog knobs
 						// Bit 6:	Enable buttons for the axes
 						// Bit 7:	Invert light signals (always on, press or HID turns them off)
+						// Bit 8:	Enable QE pair mode (divert QE1B and QE2B to X Axis)
 	int8_t qe_sens[2];
 	uint8_t ps2_mode;
 	uint8_t rgb_mode;
