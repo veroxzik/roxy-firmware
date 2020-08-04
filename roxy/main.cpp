@@ -16,6 +16,7 @@
 #include "usb_strings.h"
 #include "configloader.h"
 #include "config.h"
+#include "button_leds.h"
 #include "rgb/rgb_config.h"
 #include "rgb/ws2812b.h"
 #include "rgb/tlc59711.h"
@@ -93,6 +94,8 @@ extern Pin usb_pu;
 
 extern Pin button_inputs[];
 extern Pin button_leds[];
+
+extern Button_Leds button_led_manager;	// In button_leds.h
 
 extern Pin qe1a;
 extern Pin qe1b;
@@ -213,7 +216,8 @@ class HID_arcin : public USB_HID {
 			
 			last_led_time = Time::time();
 			for (int i = 0; i < NUM_BUTTONS; i++) {
-				button_leds[i].set(((report->leds) >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
+				// button_leds[i].set(((report->leds) >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
+				button_led_manager.set_led(i, ((report->leds) >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
 			}
 			
 			switch (config.rgb_mode) {
@@ -235,6 +239,7 @@ class HID_arcin : public USB_HID {
 					tlc59711.schedule_dma();
 					break;
 			}
+			// button_led_manager.set_pwm(0, report->r1 * 100 / 255);
 		
 			return true;
 		}
@@ -573,6 +578,8 @@ int main() {
 		button_time[i] = Time::time();
 		last_state[i] = button_inputs[i].get();
 	}
+
+	button_led_manager.init(500);
 	
 	led1.set_mode(Pin::Output);
 	if(config.flags & (1 << 3)) {
@@ -831,7 +838,8 @@ int main() {
 
 		if(Time::time() - last_led_time > 1000) {
 			for (int i = 0; i < NUM_BUTTONS; i++) {
-				button_leds[i].set((buttons >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
+				//button_leds[i].set((buttons >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
+				button_led_manager.set_led(i, (buttons >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
 			}
 
 			// Breathing LEDs, only TLC59711 supported

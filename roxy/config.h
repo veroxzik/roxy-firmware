@@ -27,8 +27,10 @@ struct config_t {
 };
 
 struct mapping_config_t {
-	uint8_t button_kb_map[12];	// Keycodes for each button
-	uint8_t axes_kb_map[4];		// Keycodes for the axes (Overrides Flag bit 6)
+	uint8_t button_kb_map[12];		// Keycodes for each button
+	uint8_t axes_kb_map[4];			// Keycodes for the axes (Overrides Flag bit 6)
+	uint8_t button_joy_map[12];		// Remapped joystick buttons if they are not the default
+	uint8_t button_led_mode[6];		// 1 nibble per button
 };
 
 #endif
