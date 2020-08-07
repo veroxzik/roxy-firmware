@@ -139,20 +139,20 @@ auto report_desc = joystick(
 		report_count(1),
 		output(0x02)
 	),
-	
-	padding_out(5),
-	
-	logical_maximum(255),
-	
+
 	usage_page(UsagePage::Ordinal),
 	usage(12),
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
-		report_size(8),
+		report_size(1),
 		report_count(1),
 		output(0x02)
 	),
+	
+	padding_out(4),
+	
+	logical_maximum(255),
 	
 	usage_page(UsagePage::Ordinal),
 	usage(13),
@@ -193,7 +193,7 @@ auto report_desc = joystick(
 		report_count(1),
 		output(0x02)
 	),
-
+	
 	usage_page(UsagePage::Ordinal),
 	usage(17),
 	collection(Collection::Logical, 
@@ -206,6 +206,16 @@ auto report_desc = joystick(
 
 	usage_page(UsagePage::Ordinal),
 	usage(18),
+	collection(Collection::Logical, 
+		usage_page(UsagePage::LED),
+		usage(0x4b),
+		report_size(8),
+		report_count(1),
+		output(0x02)
+	),
+
+	usage_page(UsagePage::Ordinal),
+	usage(19),
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
