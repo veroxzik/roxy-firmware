@@ -29,8 +29,14 @@ struct config_t {
 struct mapping_config_t {
 	uint8_t button_kb_map[12];		// Keycodes for each button
 	uint8_t axes_kb_map[4];			// Keycodes for the axes (Overrides Flag bit 6)
-	uint8_t button_joy_map[12];		// Remapped joystick buttons if they are not the default
+	uint8_t button_joy_map[6];		// Remapped joystick buttons if they are not the default
+									// 1 nibble per button
 	uint8_t button_led_mode[6];		// 1 nibble per button
+									// 0 = Standard
+									// 1 = Standard (Invert)
+									// 2 = Fade out
+									// 3 = Fade out (Invert)
+	uint16_t button_led_fade_time;	// Time in ms
 };
 
 #endif

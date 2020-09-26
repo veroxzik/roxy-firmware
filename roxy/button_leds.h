@@ -10,12 +10,16 @@
 
 #define NUM_STEPS	20
 
+enum LedMode {
+	Standard = 0,
+	StandardInvert,
+	FadeOut,
+	FadeOutInvert,
+	Pwm
+};
+
 class Button_Leds {
 	private:
-		enum Mode {
-			FadeOut,
-			Pwm
-		};
 		uint32_t ramp_down_cycles;	// Converted to timer cycles
 		float ramp_down_slope;
 		bool led_on_req[NUM_BUTTONS];
@@ -24,7 +28,7 @@ class Button_Leds {
 		uint32_t led_current_period[NUM_BUTTONS];
 		uint32_t led_percentage[NUM_BUTTONS];
 		uint32_t cycle_count[NUM_BUTTONS];
-		Mode led_mode[NUM_BUTTONS];
+		LedMode led_mode[NUM_BUTTONS];
 		
 
 		const uint8_t gamma_input[NUM_STEPS] = {100, 30, 20, 10, 0};
@@ -46,11 +50,17 @@ class Button_Leds {
 			ramp_down_slope = -100.0f / (float)ramp_down_cycles;
 		}
 
+		void set_mode(uint8_t index, LedMode mode) {
+			if(index >= NUM_BUTTONS) {
+				return;
+			}
+			led_mode[index] = mode;
+		}
+
 		void set_led(uint8_t index, bool state) {
 			if(index >= NUM_BUTTONS) {
 				return;
 			}
-			led_mode[index] = Mode::FadeOut;
 
 			if(state) {
 				led_on_req[index] = true;
@@ -69,7 +79,7 @@ class Button_Leds {
 			if(percentage == led_percentage[index]) {
 				return;
 			}
-			led_mode[index] = Mode::Pwm;
+			led_mode[index] = LedMode::Pwm;
 
 			led_percentage[index] = percentage;
 			led_current_period[index] = 0;
@@ -83,7 +93,23 @@ class Button_Leds {
 			uint32_t cur_time = Time::time();
 			for(int i=0; i<NUM_BUTTONS; i++) {
 				switch(led_mode[i]) {
-					case Mode::FadeOut:
+					case LedMode::Standard:
+						if(led_on_req[i]) {
+							button_leds[i].on();
+						} else {
+							button_leds[i].off();
+						}
+						break;
+
+					case LedMode::StandardInvert:
+						if(led_on_req[i]) {
+							button_leds[i].off();
+						} else {
+							button_leds[i].on();
+						}
+						break;
+
+					case LedMode::FadeOut:
 						if(led_on_req[i]) {
 							button_leds[i].on();
 						} else if((cur_time - led_release_time[i]) >= (ramp_down_cycles * 20)) {	// Convert cycles to ms
@@ -104,7 +130,28 @@ class Button_Leds {
 						}
 						break;
 
-					case Mode::Pwm:
+					case LedMode::FadeOutInvert:
+						if(led_on_req[i]) {
+							button_leds[i].off();
+						} else if((cur_time - led_release_time[i]) >= (ramp_down_cycles * 20)) {	// Convert cycles to ms
+							button_leds[i].on();
+						} else {
+							uint32_t elapsed = 20 * (cur_time - led_release_time[i]);	// Get elapsed cycles
+							// Set percentage based on elapsed cycles
+							led_percentage[i] = ramp_down_slope * (float)elapsed + 100;
+							if(led_current_period[i] < led_percentage[i]) {
+								button_leds[i].off();
+							} else {
+								button_leds[i].on();
+							}
+							led_current_period[i]++;
+							if(led_current_period[i] >= led_set_period[i]) {
+								led_current_period[i] = 0;
+							}
+						}
+						break;
+
+					case LedMode::Pwm:
 						if(led_current_period[i] < led_percentage[i]) {
 							button_leds[i].on();
 						} else {

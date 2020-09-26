@@ -216,7 +216,6 @@ class HID_arcin : public USB_HID {
 			
 			last_led_time = Time::time();
 			for (int i = 0; i < NUM_BUTTONS; i++) {
-				// button_leds[i].set(((report->leds) >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
 				button_led_manager.set_led(i, ((report->leds) >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
 			}
 			
@@ -239,8 +238,7 @@ class HID_arcin : public USB_HID {
 					tlc59711.schedule_dma();
 					break;
 			}
-			// button_led_manager.set_pwm(0, report->r1 * 100 / 255);
-		
+					
 			return true;
 		}
 		
@@ -569,7 +567,7 @@ int main() {
 	uint32_t button_time[12];
 	bool last_state[12];
 	
-	for (int i = 0; i < NUM_BUTTONS; i++) {
+	for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
 		button_inputs[i].set_mode(Pin::Input);
 		button_inputs[i].set_pull(Pin::PullUp);
 		
@@ -577,6 +575,8 @@ int main() {
 
 		button_time[i] = Time::time();
 		last_state[i] = button_inputs[i].get();
+
+		button_led_manager.set_mode(i, (LedMode)((mapping_config.button_led_mode[i / 2] >> ((i % 2) * 4)) & 0xF));
 	}
 
 	button_led_manager.init(500);
@@ -838,7 +838,6 @@ int main() {
 
 		if(Time::time() - last_led_time > 1000) {
 			for (int i = 0; i < NUM_BUTTONS; i++) {
-				//button_leds[i].set((buttons >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
 				button_led_manager.set_led(i, (buttons >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
 			}
 
