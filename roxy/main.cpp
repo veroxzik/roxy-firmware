@@ -579,7 +579,7 @@ int main() {
 		button_led_manager.set_mode(i, (LedMode)((mapping_config.button_led_mode[i / 2] >> ((i % 2) * 4)) & 0xF));
 	}
 
-	button_led_manager.init(500);
+	button_led_manager.init(mapping_config.button_led_fade_time);
 	
 	led1.set_mode(Pin::Output);
 	if(config.flags & (1 << 3)) {
