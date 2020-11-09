@@ -17,6 +17,7 @@
 #include "configloader.h"
 #include "config.h"
 #include "button_leds.h"
+#include "button_manager.h"
 #include "rgb/rgb_config.h"
 #include "rgb/ws2812b.h"
 #include "rgb/tlc59711.h"
@@ -24,6 +25,9 @@
 #include "rgb/hsv2rgb.h"
 #include "rgb/led_breathing.h"
 #include "rgb/sdvx_led_strip.h"
+
+#include "device/device_config.h"
+#include "device/svre9led.h"
 
 static uint32_t& reset_reason = *(uint32_t*)0x10000000;
 
@@ -42,10 +46,12 @@ void reset_bootloader() {
 Configloader configloader(0x801f800);
 Configloader rgb_configloader(0x8020000);
 Configloader mapping_configloader(0x8020800);
+Configloader device_configloader(0x8021000);
 
 config_t config;
 rgb_config_t rgb_config;
 mapping_config_t mapping_config;
+device_config_t device_config;
 
 #if defined(ROXY)
 auto dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x16d0, 0x0f8b, 0x0002, 1, 2, 3, 1);
@@ -96,6 +102,7 @@ extern Pin button_inputs[];
 extern Pin button_leds[];
 
 extern Button_Leds button_led_manager;	// In button_leds.h
+Button_Manager button_manager; 	// In button_manager.h
 
 extern Pin qe1a;
 extern Pin qe1b;
@@ -137,6 +144,9 @@ Led_Breathing breathing_leds;	// In rgb/led_breathing.h
 
 uint32_t last_led_time;
 
+// Other vendor devices
+SVRE9LED svre9leds;		// In devices/svre9led.h
+
 class HID_arcin : public USB_HID {
 	private:
 		uint8_t config_id = 0;
@@ -166,7 +176,10 @@ class HID_arcin : public USB_HID {
 				rgb_configloader.write(report->size, report->data);
 			} else if(report->segment == 2) {
 				mapping_configloader.write(report->size, report->data);
-			} else {
+			} else if(report->segment == 3) {
+				device_configloader.write(report->size, report->data);
+			}
+			else {
 				return false;
 			}
 			
@@ -174,32 +187,71 @@ class HID_arcin : public USB_HID {
 		}
 		
 		bool get_feature_config() {
+			// config_report_t report;
+
+			// switch(config_id) {
+			// 	case 0:
+			// 		report = {0xc0, config_id, sizeof(config)};
+			// 		config_id++;
+			// 		break;
+			// 	case 1:
+			// 		report = {0xc0, config_id, sizeof(rgb_config)};
+			// 		config_id++;
+			// 		break;
+			// 	case 2:
+			// 		report = {0xc0, config_id, sizeof(mapping_config)};
+			// 		config_id++;
+			// 		break;
+			// 	case 3:
+			// 		report = {0xc0, config_id, sizeof(device_config)};
+			// 		config_id = 0;
+			// 		break;
+			// }
+
 			if(config_id == 0) {
 				config_report_t report = {0xc0, 0, sizeof(config)};
-			
 				memcpy(report.data, &config, sizeof(config));
-				
 				usb.write(0, (uint32_t*)&report, sizeof(report));
-
 				config_id = 1;
 			} else if(config_id == 1) {
 				config_report_t rgb_report = {0xc0, 1, sizeof(rgb_config)};
-
 				memcpy(rgb_report.data, &rgb_config, sizeof(rgb_config));
-				
 				usb.write(0, (uint32_t*)&rgb_report, sizeof(rgb_report));
-
 				config_id = 2;
-			} else {
+			} else if(config_id == 2) {
 				config_report_t mapping_report = {0xc0, 2, sizeof(mapping_config)};
-
 				memcpy(mapping_report.data, &mapping_config, sizeof(mapping_config));
-
 				usb.write(0, (uint32_t*)&mapping_report, sizeof(mapping_report));
-
+				config_id = 3;
+			}
+			else {
+				config_report_t device_report = {0xc0, 3, sizeof(device_config)};
+				memcpy(device_report.data, &device_config, sizeof(device_config));
+				usb.write(0, (uint32_t*)&device_report, sizeof(device_report));
 				config_id = 0;
 			}
+
+			// memcpy(report.data, &config, sizeof(config));
+			// usb.write(0, (uint32_t*)&report, sizeof(report));
 			
+			return true;
+		}
+
+		bool set_feature_command(device_report_t* report) {
+			switch (report->command_id)
+			{
+			case 1:	// Toggle SVRE9 leds
+				if(report->data == 0) {
+					svre9leds.toggle_left();
+				} else if (report->data == 1) {
+					svre9leds.toggle_right();
+				}
+				break;
+			
+			default:
+				return false;
+			}
+
 			return true;
 		}
 	
@@ -258,6 +310,13 @@ class HID_arcin : public USB_HID {
 					
 					return set_feature_config((config_report_t*)buf);
 				
+				case 0xd0:
+					if(len != sizeof(device_report_t)) {
+						return false;
+					}
+
+					return set_feature_command((device_report_t*)buf);
+
 				default:
 					return false;
 			}
@@ -530,6 +589,7 @@ int main() {
 	configloader.read(sizeof(config), &config);
 	rgb_configloader.read(sizeof(rgb_config), &rgb_config);
 	mapping_configloader.read(sizeof(mapping_config), &mapping_config);
+	device_configloader.read(sizeof(device_config), &device_config);
 	
 	RCC.enable(RCC.GPIOA);
 	RCC.enable(RCC.GPIOB);
@@ -564,17 +624,19 @@ int main() {
 	usb_pu.on();
 #endif
 
-	uint32_t button_time[12];
-	bool last_state[12];
+	// uint32_t button_time[12];
+	// bool last_state[12];
 	
+	button_manager.init();
+
 	for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
-		button_inputs[i].set_mode(Pin::Input);
-		button_inputs[i].set_pull(Pin::PullUp);
+		// button_inputs[i].set_mode(Pin::Input);
+		// button_inputs[i].set_pull(Pin::PullUp);
 		
 		button_leds[i].set_mode(Pin::Output);
 
-		button_time[i] = Time::time();
-		last_state[i] = button_inputs[i].get();
+		// button_time[i] = Time::time();
+		// last_state[i] = button_inputs[i].get();
 
 		button_led_manager.set_mode(i, (LedMode)((mapping_config.button_led_mode[i / 2] >> ((i % 2) * 4)) & 0xF));
 	}
@@ -684,6 +746,11 @@ int main() {
 			}
 			break;
 	}
+
+	// Set up other vendor devices
+	if(device_config.device_enable & (1 << 0)) {
+		svre9leds.init(device_config.svre_led_mapping & 0xF, (device_config.svre_led_mapping >> 4) & 0xF);
+	}
 	
 	// Number of cycles TT buttons will turn off once no motion is detected
 	const int8_t tt_cycles = 50;
@@ -700,22 +767,24 @@ int main() {
 	while(1) {
 		usb->process();
 		
-#ifdef ARCIN
-		uint16_t buttons = 0x7ff;
-#else
-		uint16_t buttons = 0xfff;
-#endif
-		for (int i = 0; i < NUM_BUTTONS; i++) {
-			bool read = button_inputs[i].get();
-			if((Time::time() - button_time[i]) >= config.debounce_time)
-			{
-				if(last_state[i] != read)
-					button_time[i] = Time::time();
+// #ifdef ARCIN
+// 		uint16_t buttons = 0x7ff;
+// #else
+// 		uint16_t buttons = 0xfff;
+// #endif
+// 		for (int i = 0; i < NUM_BUTTONS; i++) {
+// 			bool read = button_inputs[i].get();
+// 			if((Time::time() - button_time[i]) >= config.debounce_time)
+// 			{
+// 				if(last_state[i] != read)
+// 					button_time[i] = Time::time();
 
-				buttons ^= read << i;
-				last_state[i] = read;
-			}
-		}
+// 				buttons ^= read << i;
+// 				last_state[i] = read;
+// 			}
+// 		}
+
+		uint16_t buttons = button_manager.read_buttons();
 		
 		if(do_reset_bootloader) {
 			Time::sleep(10);

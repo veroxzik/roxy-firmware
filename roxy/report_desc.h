@@ -249,7 +249,19 @@ auto report_desc = joystick(
 	
 	usage(0xc0ff),
 	report_count(60),
-	feature(0x02) // Config data
+	feature(0x02), // Config data
+
+	// Devices
+	report_id(0xd0),
+
+	usage(0xd000),
+	report_count(2),
+	feature(0x02),	// Command ID
+
+	usage(0xd001),
+	report_count(4),
+	feature(0x02)	// Data
+
 );
 
 auto keyboard_report_desc = keyboard(
@@ -304,6 +316,12 @@ struct config_report_t {
 	uint8_t size;
 	uint8_t pad;
 	uint8_t data[60];
+} __attribute__((packed));
+
+struct device_report_t {
+	uint8_t report_id;
+	uint16_t command_id;
+	uint32_t data;
 } __attribute__((packed));
 
 #endif
