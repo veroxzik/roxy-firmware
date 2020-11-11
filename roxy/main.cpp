@@ -187,27 +187,6 @@ class HID_arcin : public USB_HID {
 		}
 		
 		bool get_feature_config() {
-			// config_report_t report;
-
-			// switch(config_id) {
-			// 	case 0:
-			// 		report = {0xc0, config_id, sizeof(config)};
-			// 		config_id++;
-			// 		break;
-			// 	case 1:
-			// 		report = {0xc0, config_id, sizeof(rgb_config)};
-			// 		config_id++;
-			// 		break;
-			// 	case 2:
-			// 		report = {0xc0, config_id, sizeof(mapping_config)};
-			// 		config_id++;
-			// 		break;
-			// 	case 3:
-			// 		report = {0xc0, config_id, sizeof(device_config)};
-			// 		config_id = 0;
-			// 		break;
-			// }
-
 			if(config_id == 0) {
 				config_report_t report = {0xc0, 0, sizeof(config)};
 				memcpy(report.data, &config, sizeof(config));
@@ -230,9 +209,6 @@ class HID_arcin : public USB_HID {
 				usb.write(0, (uint32_t*)&device_report, sizeof(device_report));
 				config_id = 0;
 			}
-
-			// memcpy(report.data, &config, sizeof(config));
-			// usb.write(0, (uint32_t*)&report, sizeof(report));
 			
 			return true;
 		}
@@ -624,24 +600,7 @@ int main() {
 	usb_pu.on();
 #endif
 
-	// uint32_t button_time[12];
-	// bool last_state[12];
-	
-	button_manager.init();
-
-	for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
-		// button_inputs[i].set_mode(Pin::Input);
-		// button_inputs[i].set_pull(Pin::PullUp);
-		
-		button_leds[i].set_mode(Pin::Output);
-
-		// button_time[i] = Time::time();
-		// last_state[i] = button_inputs[i].get();
-
-		button_led_manager.set_mode(i, (LedMode)((mapping_config.button_led_mode[i / 2] >> ((i % 2) * 4)) & 0xF));
-	}
-
-	button_led_manager.init(mapping_config.button_led_fade_time);
+	button_manager.init();	
 	
 	led1.set_mode(Pin::Output);
 	if(config.flags & (1 << 3)) {
@@ -767,23 +726,6 @@ int main() {
 	while(1) {
 		usb->process();
 		
-// #ifdef ARCIN
-// 		uint16_t buttons = 0x7ff;
-// #else
-// 		uint16_t buttons = 0xfff;
-// #endif
-// 		for (int i = 0; i < NUM_BUTTONS; i++) {
-// 			bool read = button_inputs[i].get();
-// 			if((Time::time() - button_time[i]) >= config.debounce_time)
-// 			{
-// 				if(last_state[i] != read)
-// 					button_time[i] = Time::time();
-
-// 				buttons ^= read << i;
-// 				last_state[i] = read;
-// 			}
-// 		}
-
 		uint16_t buttons = button_manager.read_buttons();
 		
 		if(do_reset_bootloader) {
@@ -906,9 +848,7 @@ int main() {
 		}
 
 		if(Time::time() - last_led_time > 1000) {
-			for (int i = 0; i < NUM_BUTTONS; i++) {
-				button_led_manager.set_led(i, (buttons >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
-			}
+			button_manager.set_leds_reactive();
 
 			// Breathing LEDs, only TLC59711 supported
 			if(config.rgb_mode == 2 && rgb_config.rgb_mode == 1) {

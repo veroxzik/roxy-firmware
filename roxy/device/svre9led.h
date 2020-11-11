@@ -5,9 +5,6 @@
 #include <gpio/gpio.h>
 
 // This class cycles through the stock SVRE9 LEDs
-// For now, it is hardcoded to use the Buttons 11 and 12
-// 11 = left
-// 12 = right
 
 extern Pin button_inputs[];
 

@@ -6,9 +6,12 @@
 
 #include "board_define.h"
 #include "config.h"
+#include "button_leds.h"
 #include "device/device_config.h"
 
 extern Pin button_inputs[];
+extern Pin button_leds[];
+extern Button_Leds button_led_manager;
 
 extern config_t config;
 extern mapping_config_t mapping_config;
@@ -46,16 +49,21 @@ class Button_Manager {
 
                     button_time[i] = Time::time();
                     last_state[i] = button_inputs[i].get();
+
+                    mapping[i] = (mapping_config.button_joy_map[i / 2] >> ((i % 2) * 4)) & 0xF;
+
+                    // Setup LEDs
+                    button_leds[i].set_mode(Pin::Output);
+                    button_led_manager.set_mode(i, (LedMode)((mapping_config.button_led_mode[i / 2] >> ((i % 2) * 4)) & 0xF));
                 }
             }
+
+            button_led_manager.init(mapping_config.button_led_fade_time);
         }
 
         uint16_t read_buttons() {
-#ifdef ARCIN
-		    uint16_t buttons = 0x7ff;
-#else
-		    uint16_t buttons = 0xfff;
-#endif
+		    uint16_t buttons = 0;
+
             for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
                 if (enabled[i]) {
                     bool read = button_inputs[i].get();
@@ -64,7 +72,10 @@ class Button_Manager {
                         if (last_state[i] != read)
                             button_time[i] = Time::time();
 
-                        buttons ^= read << i;
+                        if (!read) {
+                            uint8_t shift = mapping[i] > 0 ? mapping[i] - 1 : i;
+                            buttons |= 1 << shift;
+                        }
                         last_state[i] = read;
                     }
                 } else {
@@ -74,6 +85,14 @@ class Button_Manager {
             }
 
             return buttons;
+        }
+
+        void set_leds_reactive() {
+            for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
+                if (enabled[i]) {
+                    button_led_manager.set_led(i, !last_state[i] ^ ((config.flags >> 7) & 0x1));
+                }
+            }
         }
 };
 
