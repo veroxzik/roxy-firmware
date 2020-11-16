@@ -5,8 +5,7 @@
 #include <dma/dma.h>
 #include <gpio/gpio.h>
 #include <spi/spi.h>
-
-#include <cmath>
+#include <string.h>
 
 extern Pin rgb_sck;
 extern Pin rgb_mosi;
@@ -18,6 +17,7 @@ class TLC59711 {
 		uint8_t bcr, bcg, bcb;	// Brightness
 		uint16_t pwmbuffer[(2 + 12) * 7];	// Command (4 byte) + array for all channels, max of 7 TLC59711 supported
 		volatile bool busy;
+		bool enabled;
 
 		void set_command_buffer() {
 			// Setup buffer
@@ -43,6 +43,8 @@ class TLC59711 {
 
 	public:
 		void init(uint8_t n) {
+			enabled = true;
+
 			RCC.enable(RCC.SPI3);
 			RCC.enable(RCC.DMA2);
 
@@ -131,6 +133,10 @@ class TLC59711 {
 		}
 
 		void irq() {
+			if(!enabled) {
+				return;
+			}
+
 			DMA2.reg.C[1].CR = 0;	// Disable channel
 			DMA2.reg.IFCR = (1 << 4);	// Clears all interrupt flags for Channel 2
 

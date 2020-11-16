@@ -9,8 +9,12 @@ void Sdvx_Leds::update_left() {
 		for(int8_t i = (burst_pos_left - burst_width); i <= (burst_pos_left + burst_width); i++) {
 			float sat = (float)abs(burst_pos_left - i) / (float)(burst_width + 1);
 			if(i >= 0 && i < SDVX_NUM_LEDS) {
-				hsv2rgb_rainbow(CHSV(hue_left, 255, 255 * (1.0f - sat)), temp);
-				leds[i] += temp;
+				if(mode == RGB) {
+					hsv2rgb_rainbow(CHSV(hue_left, 255, 255 * (1.0f - sat)), temp);
+					leds[i] += temp;
+				} else if(mode == TwoColor) {
+					left_brightness[i] = (uint16_t)(65536.0 * (1.0f - sat));
+				}	
 			}
 		}
 	}
@@ -22,20 +26,25 @@ void Sdvx_Leds::update_right() {
 		for(int8_t i = (burst_pos_right - burst_width); i <= (burst_pos_right+ burst_width); i++) {
 			float sat = (float)abs(burst_pos_right - i) / (float)(burst_width + 1);
 			if(i >= 0 && i < SDVX_NUM_LEDS) {
-				hsv2rgb_rainbow(CHSV(hue_right, 255, 255 * (1.0f - sat)), temp);
-				leds[i] += temp;
+				if(mode == RGB) {
+					hsv2rgb_rainbow(CHSV(hue_right, 255, 255 * (1.0f - sat)), temp);
+					leds[i] += temp;
+				} else if(mode == TwoColor) {
+					right_brightness[i] = (uint16_t)(65536.0 * (1.0f - sat));
+				}	
 			}
 		}
 	}
 }
 
+void Sdvx_Leds::init(Mode mode) {
+	this->mode = mode;
+}
+
 // Return TRUE if there is an update that should be pushed to the LED driver
 bool Sdvx_Leds::update() {
 	// Don't update if there's no scrolling, or we didn't hit the update time yet
-	// if((!scroll_left && !scroll_right) || (Time::time() - last_update) < scroll_speed) {
-	// 	return false;
-	// }
-		if((Time::time() - last_update) < scroll_speed) {
+	if((!scroll_left && !scroll_right) || (Time::time() - last_update) < scroll_speed) {
 		return false;
 	}
 
@@ -55,8 +64,13 @@ bool Sdvx_Leds::update() {
 		}
 	}
 
-	// Clear and recalculate (RGB color mixing means you can't just shift the values)
-	memset(&leds, 0, sizeof(CRGB) * SDVX_NUM_LEDS);
+	// Clear and recalculate
+	if(mode == RGB) {
+		memset(&leds, 0, sizeof(CRGB) * SDVX_NUM_LEDS);
+	} else if(mode == TwoColor) {
+		memset(&left_brightness, 0, sizeof(uint16_t) * SDVX_NUM_LEDS);
+		memset(&right_brightness, 0, sizeof(uint16_t) * SDVX_NUM_LEDS);
+	}
 
 	update_left();
 	update_right();

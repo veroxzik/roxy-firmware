@@ -30,6 +30,7 @@
 
 #include "device/device_config.h"
 #include "device/svre9led.h"
+#include "device/turbocharger.h"
 
 static uint32_t& reset_reason = *(uint32_t*)0x10000000;
 
@@ -136,11 +137,6 @@ void interrupt<Interrupt::DMA1_Channel7>() {
 
 TLC59711 tlc59711;	// In rgb/tlc59711.h
 
-template <>
-void interrupt<Interrupt::DMA2_Channel2>() {
-	tlc59711.irq();
-}
-
 Sdvx_Leds sdvx_leds;	// In rgb/sdvx_led_strip.h
 Led_Breathing breathing_leds;	// In rgb/led_breathing.h
 
@@ -148,6 +144,13 @@ uint32_t last_led_time;
 
 // Other vendor devices
 SVRE9LED svre9leds;		// In devices/svre9led.h
+Turbocharger tcleds;	// In devices/turbocharger.h
+
+template <>
+void interrupt<Interrupt::DMA2_Channel2>() {
+	tcleds.irq();
+	tlc59711.irq();
+}
 
 class HID_arcin : public USB_HID {
 	private:
@@ -343,7 +346,7 @@ void interrupt<Interrupt::EXTI1>() {
 
 template<>
 void interrupt<Interrupt::EXTI9_5>() {
-	if(EXTI.PR1 & (1 <<7 )) {
+	if(EXTI.PR1 & (1 << 7)) {
 		EXTI.PR1 |= (1 << 7);	// Clear flag
 		axis_int.updateEncoder();
 	}
@@ -503,6 +506,7 @@ int main() {
 				breathing_leds.set_hue(1, rgb_config.led2_hue);
 			}
 			if(rgb_config.rgb_mode == 2) {
+				sdvx_leds.init(Sdvx_Leds::RGB);
 				sdvx_leds.set_left_hue(rgb_config.led1_hue);
 				sdvx_leds.set_right_hue(rgb_config.led2_hue);
 			}
@@ -512,6 +516,10 @@ int main() {
 	// Set up other vendor devices
 	if(device_config.device_enable & (1 << 0)) {
 		svre9leds.init(device_config.svre_led_mapping & 0xF, (device_config.svre_led_mapping >> 4) & 0xF);
+	}
+	if(device_config.device_enable & (1 << 1)) {
+		sdvx_leds.init(Sdvx_Leds::TwoColor);
+		tcleds.init();
 	}
 	
 	// Number of cycles TT buttons will turn off once no motion is detected
@@ -665,15 +673,25 @@ int main() {
 			}
 		}	
 
-		// SDVX LED strips, only TLC59711 supported
-		if(config.rgb_mode == 2 && rgb_config.rgb_mode == 2) {
+		// SDVX LED strips
+		if(device_config.device_enable & (1 << 1)) {
+			// TC hardware takes precedent if it is enabled
 			if(sdvx_leds.update()) {
-				for( int i = 0; i < 24; i++) {
+				for(uint8_t i = 0; i < sdvx_leds.get_num_leds(); i++) {
+					tcleds.set_left_led(i, sdvx_leds.get_left_brightness(i));
+					tcleds.set_right_led(i, sdvx_leds.get_right_brightness(i));
+				}
+				tcleds.schedule_dma();
+			}
+		} else if(config.rgb_mode == 2 && rgb_config.rgb_mode == 2) {
+			// TLC59711 mode
+			if(sdvx_leds.update()) {
+				for( int i = 0; i < sdvx_leds.get_num_leds(); i++) {
 					CRGB temp = sdvx_leds.get_led(i);
 					tlc59711.set_led_8bit(i, temp.b, temp.r, temp.g);
 				}
 				tlc59711.schedule_dma();
 			}
-		}	
+		}
 	}
 }
