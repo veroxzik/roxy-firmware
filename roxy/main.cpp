@@ -23,6 +23,7 @@
 #include "rgb/rgb_config.h"
 #include "rgb/ws2812b.h"
 #include "rgb/tlc59711.h"
+#include "rgb/tlc5973.h"
 #include "rgb/pixeltypes.h"
 #include "rgb/hsv2rgb.h"
 #include "rgb/led_breathing.h"
@@ -137,6 +138,8 @@ void interrupt<Interrupt::DMA1_Channel7>() {
 
 TLC59711 tlc59711;	// In rgb/tlc59711.h
 
+TLC5973 tlc5973;	// In rgb/tlc5973.h
+
 Sdvx_Leds sdvx_leds;	// In rgb/sdvx_led_strip.h
 Led_Breathing breathing_leds;	// In rgb/led_breathing.h
 
@@ -150,6 +153,7 @@ template <>
 void interrupt<Interrupt::DMA2_Channel2>() {
 	tcleds.irq();
 	tlc59711.irq();
+	tlc5973.irq();
 }
 
 class HID_arcin : public USB_HID {
@@ -269,6 +273,11 @@ class HID_arcin : public USB_HID {
 						break;
 					}
 					tlc59711.schedule_dma();
+					break;
+				case 3:
+					tlc5973.set_led_8bit(0, report->r1, report->g1, report->b1);
+					tlc5973.set_led_8bit(1, report->r2, report->g2, report->b2);
+					tlc5973.schedule_dma();
 					break;
 			}
 					
@@ -487,6 +496,11 @@ int main() {
 
 	uint32_t axis_time[2] = {0, 0};
 	
+	if(rgb_config.rgb_mode == 1) {
+		breathing_leds.set_hue(0, rgb_config.led1_hue);
+		breathing_leds.set_hue(1, rgb_config.led2_hue);
+	}
+	
 	switch(config.rgb_mode) {
 		case 1:
 			ws2812b.init();
@@ -501,15 +515,15 @@ int main() {
 					break;
 			}
 			tlc59711.set_brightness(config.rgb_brightness / 2);
-			if(rgb_config.rgb_mode == 1) {
-				breathing_leds.set_hue(0, rgb_config.led1_hue);
-				breathing_leds.set_hue(1, rgb_config.led2_hue);
-			}
 			if(rgb_config.rgb_mode == 2) {
 				sdvx_leds.init(Sdvx_Leds::RGB);
 				sdvx_leds.set_left_hue(rgb_config.led1_hue);
 				sdvx_leds.set_right_hue(rgb_config.led2_hue);
 			}
+			break;
+		case 3:
+			tlc5973.init();
+			tlc5973.set_brightness(config.rgb_brightness);
 			break;
 	}
 
@@ -661,14 +675,20 @@ int main() {
 		if(Time::time() - last_led_time > 1000) {
 			button_manager.set_leds_reactive();
 
-			// Breathing LEDs, only TLC59711 supported
-			if(config.rgb_mode == 2 && rgb_config.rgb_mode == 1) {
-				if(breathing_leds.update(state_axis[0], state_axis[1])) {
-					CRGB temp = breathing_leds.get_led(0);
-					tlc59711.set_led_8bit(3, temp.r, temp.g, temp.b);
-					temp = breathing_leds.get_led(1);
-					tlc59711.set_led_8bit(2, temp.r, temp.g, temp.b);
-					tlc59711.schedule_dma();
+			// Breathing LEDs
+			if(rgb_config.rgb_mode == 1) {
+				if(breathing_leds.update(state_axis[0], state_axis[1])) { 
+					CRGB temp1 = breathing_leds.get_led(0);
+					CRGB temp2 = breathing_leds.get_led(1);
+					if(config.rgb_mode == 2) {
+						tlc59711.set_led_8bit(3, temp1.r, temp1.g, temp1.b);
+						tlc59711.set_led_8bit(2, temp2.r, temp2.g, temp2.b);
+						tlc59711.schedule_dma();
+					} else if(config.rgb_mode == 3) {
+						tlc5973.set_led_8bit(0, temp1.r, temp1.g, temp1.b);
+						tlc5973.set_led_8bit(1, temp2.r, temp2.g, temp2.b);
+						tlc5973.schedule_dma();
+					}
 				}
 			}
 		}	
