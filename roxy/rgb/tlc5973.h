@@ -59,8 +59,8 @@ class TLC5973 {
 			SPI3.reg.CR2 = 	(7 < 8) |	// DS = 8bit
 							(1 << 1);	// TX DMA Enabled
 			// CR1: LSBFIRST = 0 (default, MSBFIRST),  CPOL = 0 (default), CPHA = 0 (default)
-			SPI3.reg.CR1 = (1 << 9) | (1 << 8 ) | (5 << 3) | (1 << 2);	
-			// SSM = 1, SSI = 1, BR = 5 (FpCLK/64), MSTR = 1
+			SPI3.reg.CR1 = (1 << 9) | (1 << 8 ) | (4 << 3) | (1 << 2);	
+			// SSM = 1, SSI = 1, BR = 4 (FpCLK/32), MSTR = 1
 
 			// CRC = default (not used anyway)
 			SPI3.reg.CRCPR = 7;
