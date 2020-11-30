@@ -28,6 +28,7 @@
 #include "rgb/hsv2rgb.h"
 #include "rgb/led_breathing.h"
 #include "rgb/sdvx_led_strip.h"
+#include "rgb/tt_led.h"
 
 #include "device/device_config.h"
 #include "device/svre9led.h"
@@ -142,6 +143,7 @@ TLC5973 tlc5973;	// In rgb/tlc5973.h
 
 Sdvx_Leds sdvx_leds;	// In rgb/sdvx_led_strip.h
 Led_Breathing breathing_leds;	// In rgb/led_breathing.h
+Turntable_Leds tt_leds;	// In rgb/tt_led.h
 
 uint32_t last_led_time;
 
@@ -232,7 +234,12 @@ class HID_arcin : public USB_HID {
 					svre9leds.toggle_right();
 				}
 				break;
-			
+			// case 2:	// Set TT LED color
+			// 	uint8_t h = report->data & 0xFF;
+			// 	uint8_t s = (report->data >> 8) & 0xFF;
+			// 	uint8_t v = (report->data >> 16) & 0xFF;
+			// 	tt_leds.set_solid(h, s, v);
+			// 	break;
 			default:
 				return false;
 			}
@@ -496,11 +503,19 @@ int main() {
 
 	uint32_t axis_time[2] = {0, 0};
 	
-	if(rgb_config.rgb_mode == 1) {
-		breathing_leds.set_hue(0, rgb_config.led1_hue);
-		breathing_leds.set_hue(1, rgb_config.led2_hue);
+	// Initialize RGB modes
+	switch(rgb_config.rgb_mode) {
+		case 1:
+			breathing_leds.set_hue(0, rgb_config.led1_hue);
+			breathing_leds.set_hue(1, rgb_config.led2_hue);
+			break;
+		case 3:
+			tt_leds.init(rgb_config.tt_num_leds, (Turntable_Leds::Mode)rgb_config.tt_mode);
+			tt_leds.set_brightness(config.rgb_brightness);
+			break;
 	}
 	
+	// Set RGB Interfaces
 	switch(config.rgb_mode) {
 		case 1:
 			ws2812b.init();
@@ -547,6 +562,9 @@ int main() {
 	int8_t last_axis_state[2] = {0, 0};
 	uint32_t qe_count[2] = {0, 0};
 	uint32_t axis_buttons[4] = {(1 << 12), (1 << 13), (1 << 14), (1 << 15)};
+
+	// TEMP
+	uint8_t col = 0;
 
 	while(1) {
 		usb->process();
@@ -595,9 +613,15 @@ int main() {
 			if(state_axis[i] > 0) {
 				state_req = 1;
 				sdvx_leds.set_active(i, true);
+				if(i == rgb_config.tt_axis) {
+					tt_leds.set_direction(Turntable_Leds::CW);
+				}
 			} else if(state_axis[i] < 0) {
 				state_req = -1;
 				sdvx_leds.set_active(i, false);
+				if(i == rgb_config.tt_axis) {
+					tt_leds.set_direction(Turntable_Leds::CCW);
+				}
 			}
 
 			if(last_axis_state[i] != 0) {
@@ -692,6 +716,19 @@ int main() {
 				}
 			}
 		}	
+
+		// TT LEDs
+		if(rgb_config.rgb_mode == 3) {
+			if(tt_leds.update()) {
+				CRGB* leds = tt_leds.get_leds();
+				if(config.rgb_mode == 1) {
+					uint8_t num_leds = tt_leds.get_num_leds();
+					for(uint8_t i = 0; i < num_leds; i++) {
+						ws2812b.set_led(i, leds[i].r, leds[i].g, leds[i].b, i == (num_leds - 1));
+					}
+				}
+			}
+		}
 
 		// SDVX LED strips
 		if(device_config.device_enable & (1 << 1)) {

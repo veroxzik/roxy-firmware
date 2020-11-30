@@ -9,12 +9,18 @@
 #include <os/time.h>
 #include "../board_define.h"
 
+#ifndef MAX_LEDS
+#define MAX_LEDS	24
+#endif
+
 extern Pin ws_data;
 
 class WS2812B {
 	private:
+		uint32_t rgb_data[MAX_LEDS];
 		uint8_t dmabuf[26];
 		volatile uint32_t cnt;
+		volatile bool use_array;
 		volatile bool busy;
 		
 		void schedule_dma() {
@@ -58,6 +64,10 @@ class WS2812B {
 			}
 			
 			dmabuf[n] = 0;
+		}
+
+		void set_color(uint32_t col) {
+			set_color((col >> 8) & 0xFF, (col >> 16) & 0xFF, col & 0xFF);
 		}
 		
 	public:
@@ -109,10 +119,24 @@ class WS2812B {
 		void update(uint8_t r, uint8_t g, uint8_t b) {
 			set_color(r, g, b);
 			
-			cnt = 24;
+			cnt = MAX_LEDS;
 			busy = true;
+			use_array = false;
 			
 			schedule_dma();
+		}
+
+		void set_led(uint8_t index, uint8_t r, uint8_t g, uint8_t b, bool update = true) {
+			rgb_data[index] = ((uint32_t)g << 16) | ((uint32_t)r << 8) | b;
+			
+			if(update) {
+				cnt = MAX_LEDS;
+				busy = true;
+				use_array = true;
+
+				set_color(rgb_data[MAX_LEDS - cnt]);
+				schedule_dma();
+			}
 		}
 		
 		void irq() {
@@ -125,6 +149,9 @@ class WS2812B {
 #endif
 			
 			if(cnt) {
+				if(use_array) {
+					set_color(rgb_data[MAX_LEDS - cnt]);
+				}
 				schedule_dma();
 			} else {
 				busy = false;
