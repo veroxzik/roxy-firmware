@@ -113,8 +113,6 @@ class Turntable_Leds {
 					marquee_state = FastCCW;
 				}
 			}
-			// cycle_count = 0;
-			// timeout_count = 0;
 		}
 
 		void set_solid(uint8_t hue, uint8_t sat = 255, uint8_t val = 255) {
@@ -159,7 +157,6 @@ class Turntable_Leds {
 						}
 					}
 
-
 					for(uint8_t i = 0; i < num_leds; i++) {
 						float sat = 0.0f;
 						if(marquee_state == NeutralCW || marquee_state == FastCW) {
@@ -167,8 +164,8 @@ class Turntable_Leds {
 						} else {
 							sat = gamma[((i + start_index) % mod_val)];
 						}
-						
-						leds[i] = CHSV(0, 255, (uint8_t)((float)brightness * sat));
+
+						leds[i] = CHSV(rgb_config.tt_hue, rgb_config.tt_sat, (uint8_t)((float)brightness * sat));
 					}
 					if(marquee_state == NeutralCW || marquee_state == FastCW) {
 						step_left();

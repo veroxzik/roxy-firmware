@@ -563,9 +563,6 @@ int main() {
 	uint32_t qe_count[2] = {0, 0};
 	uint32_t axis_buttons[4] = {(1 << 12), (1 << 13), (1 << 14), (1 << 15)};
 
-	// TEMP
-	uint8_t col = 0;
-
 	while(1) {
 		usb->process();
 		
