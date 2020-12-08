@@ -510,8 +510,15 @@ int main() {
 			breathing_leds.set_hue(1, rgb_config.led2_hue);
 			break;
 		case 3:
-			tt_leds.init(rgb_config.tt_num_leds, (Turntable_Leds::Mode)rgb_config.tt_mode);
+			tt_leds.init(
+				rgb_config.tt_num_leds, 
+				(Turntable_Leds::Mode)rgb_config.tt_mode, 
+				(Turntable_Leds::SpinType)(rgb_config.tt_spin & 0xF), 
+				(Turntable_Leds::SpinDirection)((rgb_config.tt_spin >> 4) & 0xF));
 			tt_leds.set_brightness(config.rgb_brightness);
+			if(config.rgb_mode == 1) {
+				ws2812b.set_num_leds(rgb_config.tt_num_leds);
+			}
 			break;
 	}
 	

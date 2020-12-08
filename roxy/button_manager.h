@@ -41,6 +41,12 @@ class Button_Manager {
                         enabled[i] = false;
                     }
                 }
+#ifdef ARCIN
+                // On arcin, disable Button 9 if WS2812b is enabled
+                if(config.rgb_mode == 1 && i == 8) {
+                    enabled[i] = false;
+                }
+#endif
                 
                 // Continue setting up the button if it has not been disabled
                 if (enabled[i]) {

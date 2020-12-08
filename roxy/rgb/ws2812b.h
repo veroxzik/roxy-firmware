@@ -10,7 +10,7 @@
 #include "../board_define.h"
 
 #ifndef MAX_LEDS
-#define MAX_LEDS	24
+#define MAX_LEDS	60
 #endif
 
 extern Pin ws_data;
@@ -19,6 +19,7 @@ class WS2812B {
 	private:
 		uint32_t rgb_data[MAX_LEDS];
 		uint8_t dmabuf[26];
+		uint8_t num_leds = MAX_LEDS;
 		volatile uint32_t cnt;
 		volatile bool use_array;
 		volatile bool busy;
@@ -110,16 +111,15 @@ class WS2812B {
 			
 			TIM4.CR1 = 1 << 0;
 #endif
+			Time::sleep(1);	
 
-			Time::sleep(1);
-			
 			update(0, 0, 0);
 		}
 		
 		void update(uint8_t r, uint8_t g, uint8_t b) {
 			set_color(r, g, b);
 			
-			cnt = MAX_LEDS;
+			cnt = num_leds;
 			busy = true;
 			use_array = false;
 			
@@ -130,15 +130,19 @@ class WS2812B {
 			rgb_data[index] = ((uint32_t)g << 16) | ((uint32_t)r << 8) | b;
 			
 			if(update) {
-				cnt = MAX_LEDS;
+				cnt = num_leds;
 				busy = true;
 				use_array = true;
 
-				set_color(rgb_data[MAX_LEDS - cnt]);
+				set_color(rgb_data[num_leds - cnt]);
 				schedule_dma();
 			}
 		}
-		
+
+		void set_num_leds(uint8_t num) {
+			num_leds = num;
+		}
+	
 		void irq() {
 #if defined(ROXY)
 			DMA2.reg.C[0].CR = 0;
@@ -150,7 +154,7 @@ class WS2812B {
 			
 			if(cnt) {
 				if(use_array) {
-					set_color(rgb_data[MAX_LEDS - cnt]);
+					set_color(rgb_data[num_leds - cnt]);
 				}
 				schedule_dma();
 			} else {
