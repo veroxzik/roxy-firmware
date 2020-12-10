@@ -7,6 +7,8 @@
 extern const char16_t mfg_name[];
 extern const char product_name[];
 
+extern const char led_names[][14];
+
 uint32_t serial_num() {
 	uint32_t* uid = (uint32_t*)0x1ffff7ac;
 	
@@ -31,8 +33,8 @@ class USB_strings : public USB_class_driver {
 				const void* desc = nullptr;
 				uint16_t buf[128] = {0x300};
 				uint32_t i = 1;
-				
-				switch(wValue & 0xff) {
+				uint8_t identifier = wValue & 0xff;
+				switch(identifier) {
 					case 0:
 						desc = u"\u0304\u0409";
 						break;
@@ -91,6 +93,43 @@ class USB_strings : public USB_class_driver {
 							desc = buf;
 						}
 						break;
+
+					default:
+						if(identifier >= 0x10 && identifier <= 0x22) {
+							// desc = u"\u0316LIGHTS!!";
+							for(const char* p = led_names[identifier - 0x10]; *p; p++) {
+									buf[i++] = *p;
+								}
+								
+								buf[0] |= i * 2;
+								
+								desc = buf;
+						} else {
+							desc = u"\u0316Fallback";
+						}
+						break;
+					// case 0x1c:
+					// case 0x1d:
+					// case 0x1e:
+					// case 0x1f:
+					// case 0x20:
+					// case 0x21:
+					// case 0x22:
+					// 	for(const char* p = led_names[identifier - 0x10]; *p; p++) {
+					// 		buf[i++] = *p;
+					// 	}
+					// 	buf[0] |= i * 2;
+					// 	desc = buf;
+					// 	break;
+					// default:
+					// 	if(identifier >= 0x10 && identifier <= 0x1b) {
+					// 		for(const char* p = led_names[identifier - 0x10]; *p; p++) {
+					// 			buf[i++] = *p;
+					// 		}
+					// 		buf[0] |= i * 2;
+					// 		desc = buf;
+					// 	}
+					// 	break;
 				}
 				
 				if(!desc) {

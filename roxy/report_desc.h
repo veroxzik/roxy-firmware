@@ -35,6 +35,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x10),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -45,6 +46,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x11),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -55,6 +57,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x12),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -65,6 +68,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x13),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -75,6 +79,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x14),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -85,6 +90,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x15),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -95,6 +101,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x16),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -105,6 +112,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x17),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -115,6 +123,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x18),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -125,6 +134,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x19),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -135,6 +145,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x1a),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -145,6 +156,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x1b),
 		report_size(1),
 		report_count(1),
 		output(0x02)
@@ -159,6 +171,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x1c),
 		report_size(8),
 		report_count(1),
 		output(0x02)
@@ -169,6 +182,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x1d),
 		report_size(8),
 		report_count(1),
 		output(0x02)
@@ -179,6 +193,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x1e),
 		report_size(8),
 		report_count(1),
 		output(0x02)
@@ -189,6 +204,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x1f),
 		report_size(8),
 		report_count(1),
 		output(0x02)
@@ -199,6 +215,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x20),
 		report_size(8),
 		report_count(1),
 		output(0x02)
@@ -209,6 +226,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x21),
 		report_size(8),
 		report_count(1),
 		output(0x02)
@@ -219,6 +237,7 @@ auto report_desc = joystick(
 	collection(Collection::Logical, 
 		usage_page(UsagePage::LED),
 		usage(0x4b),
+		string_index(0x22),
 		report_size(8),
 		report_count(1),
 		output(0x02)

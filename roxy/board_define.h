@@ -30,6 +30,28 @@ const char product_name[] = "Roxy";
 
 #define NUM_BUTTONS 12
 
+const char led_names[][14] = {
+	"Button 1 LED",
+	"Button 2 LED",
+	"Button 3 LED",
+	"Button 4 LED",
+	"Button 5 LED",
+	"Button 6 LED",
+	"Button 7 LED",
+	"Button 8 LED",
+	"Button 9 LED",
+	"Button 10 LED",
+	"Button 11 LED",
+	"Button 12 LED",
+	"LED 1",
+	"RGB 1 (Red)",
+	"RGB 1 (Green)",
+	"RGB 1 (Blue)",
+	"RGB 2 (Red)",
+	"RGB 2 (Green)",
+	"RGB 2 (Blue)"
+};
+
 #elif defined(ARCIN)
 
 Pin usb_dm = GPIOA[11];
@@ -61,6 +83,28 @@ const char16_t mfg_name[] = u"\u0308zyp";
 const char product_name[] = "arcin (Roxy fw)";
 
 #define NUM_BUTTONS 11
+
+const char led_names[][14] = {
+	"Button 1 LED",
+	"Button 2 LED",
+	"Button 3 LED",
+	"Button 4 LED",
+	"Button 5 LED",
+	"Button 6 LED",
+	"Button 7 LED",
+	"Button 8 LED",
+	"Button 9 LED",
+	"Button 10 LED",
+	"Button 11 LED",
+	"Unused",
+	"LED 1",
+	"RGB (Red)",
+	"RGB (Green)",
+	"RGB (Blue)",
+	"LED 2",
+	"Unused",
+  "Unused"
+};
 
 #else
 #error "Board not defined."
