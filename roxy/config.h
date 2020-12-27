@@ -24,6 +24,8 @@ struct config_t {
 	uint8_t output_mode;	// 0: Joystick only
 							// 1: Keyboard only
 							// 2: Joystick + Keyboard
+	uint8_t reduction_ratio[2];
+	uint8_t axis_sustain_time;
 };
 
 struct mapping_config_t {

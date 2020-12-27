@@ -501,8 +501,6 @@ int main() {
 		}
 	}
 
-	uint32_t axis_time[2] = {0, 0};
-	
 	// Initialize RGB modes
 	switch(rgb_config.rgb_mode) {
 		case 1:
@@ -557,21 +555,21 @@ int main() {
 		sdvx_leds.init(Sdvx_Leds::TwoColor);
 		tcleds.init();
 	}
-	
-	// Number of cycles TT buttons will turn off once no motion is detected
-	const int8_t tt_cycles = 50;
 
-	// Number of cycles remaining before the TT buttons can swap polarities
-	const int8_t tt_switch_threshold = 20;
+	int8_t axis_state[2] = {0, 0};				// Current axis state
+	uint32_t axis_sustain_start[2] = {0, 0};	// Clock time a sustain is started
+	uint32_t axis_debounce_start[2] = {0, 0};
 
+	uint32_t axis_time[2] = {0, 0};
 	uint8_t last_axis[2] = {0, 0};
-	int8_t state_axis[2] = {0, 0};
+	
 	int8_t last_axis_state[2] = {0, 0};
 	uint32_t qe_count[2] = {0, 0};
 	uint32_t axis_buttons[4] = {(1 << 12), (1 << 13), (1 << 14), (1 << 15)};
 
 	while(1) {
 		usb->process();
+		uint32_t current_time = Time::time();
 		
 		uint16_t buttons = button_manager.read_buttons();
 		
@@ -586,86 +584,90 @@ int main() {
 		}	
 		
 		for(int i = 0; i < 2; i++) {
+			// Get new count
 			qe_count[i] = axis[i]->get();
-			int8_t delta = qe_count[i] - last_axis[i];
 
-			if(state_axis[i] > -tt_switch_threshold && delta > 1) {
-				state_axis[i] = tt_cycles;
-				last_axis[i] = qe_count[i];
-				axis_time[i] = Time::time();
-			} else if(state_axis[i] < tt_switch_threshold && delta < -1) {
-				state_axis[i] = -tt_cycles;
-				last_axis[i] = qe_count[i];
-				axis_time[i] = Time::time();
-			} else if(state_axis[i] > 0) {
-				state_axis[i]--;
-				last_axis[i] = qe_count[i];
-			} else if(state_axis[i] < 0) {
-				state_axis[i]++;
-				last_axis[i] = qe_count[i];
+			// Perform reduction
+			uint32_t qe_temp = qe_count[i];
+			if(config.reduction_ratio[i] > 0) {
+				qe_temp = uint32_t((float)qe_count[i] / (4.0f * float(config.reduction_ratio[i]) * 0.5f + 1.0f));
+				qe_temp = uint32_t((float)qe_temp * (4.0f * float(config.reduction_ratio[i]) * 0.5f + 1.0f));
 			}
 
-			if (state_axis[i] > 0 && delta > 0) {
-				state_axis[i] = tt_cycles;
-			}
-			if (state_axis[i] < 0 && delta < 0) {
-				state_axis[i] = -tt_cycles;
+			// Get delta
+			int8_t delta = qe_temp - last_axis[i];
+			last_axis[i] = qe_temp;
+
+			// Logic:
+			// If QE was stationary and is now moving, change is instant
+			// If QE was moving and is now stationary, it sustains for a set time
+			// If QE was moving and is now moving in the opposite direction, it changes if the duration is past the debounce
+
+			if(axis_state[i] == 0 && delta > 0) {
+				axis_state[i] = 1;
+			} else if(axis_state[i] == 0 && delta < 0) {
+				axis_state[i] = -1;
+			} else if(axis_state[i] != 0 && delta == 0) {
+				if(axis_state[i] == 1 || axis_state[i] == -1) {
+					axis_sustain_start[i] = current_time;
+					axis_state[i] *= 2;
+				} else {
+					if((current_time - axis_sustain_start[i]) > config.axis_sustain_time) {
+						axis_state[i] = 0;
+					}
+				}
+			} else {
+				if((axis_state[i] == 1 && delta == -1) || 
+				(axis_state[i] == -1 && delta == 1)) {
+					axis_debounce_start[i] = current_time;
+					axis_state[i] *= 2;
+				} else {
+					if((current_time - axis_debounce_start[i]) > config.axis_debounce_time) {
+						if(delta > 0) {
+							axis_state[i] = 1;
+						} else if(delta < 0) {
+							axis_state[i] = -1;
+						}
+					}
+				}
 			}
 
-			int8_t state_req = 0;
-
-			if(state_axis[i] > 0) {
-				state_req = 1;
+			if(axis_state[i] > 0) {
 				sdvx_leds.set_active(i, true);
 				if(i == rgb_config.tt_axis) {
 					tt_leds.set_direction(Turntable_Leds::CW);
 				}
-			} else if(state_axis[i] < 0) {
-				state_req = -1;
+				if(config.flags & (1 << 6)) {
+					buttons |= axis_buttons[2 * i];
+				}
+			} else if(axis_state[i] < 0) {
 				sdvx_leds.set_active(i, false);
 				if(i == rgb_config.tt_axis) {
 					tt_leds.set_direction(Turntable_Leds::CCW);
 				}
-			}
-
-			if(last_axis_state[i] != 0) {
-				if((Time::time() - axis_time[i]) >= config.axis_debounce_time) {
-					if(last_axis_state[i] != state_req) {
-						axis_time[i] = Time::time();
-					}
-					last_axis_state[i] = 0;	// Clear, let below take care of it
-				} else if(last_axis_state[i] == -state_req) {
-					// Allow the ability to change direction instantly
-					axis_time[i] = Time::time();
-					last_axis_state[i] = 0;	// Clear, let below take care of it
+				if(config.flags & (1 << 6)) {
+					buttons |= axis_buttons[2 * i + 1];
 				}
 			}
 
-			if(last_axis_state[i] == 0 && state_req > 0) {
-				axis_time[i] = Time::time();
-				last_axis_state[i] = 1;
-			} else if(last_axis_state[i] == 0 && state_req < 0) {
-				axis_time[i] = Time::time();
-				last_axis_state[i] = -1;
-			}
-
-			if(last_axis_state[i] == 1 && config.flags & (1 << 6)) {
+			if(axis_state[i] == 1 && config.flags & (1 << 6)) {
 				buttons |= axis_buttons[2 * i];
-			} else if(last_axis_state[i] == -1 && config.flags & (1 << 6)) {
+			} else if(axis_state[i] == -1 && config.flags & (1 << 6)) {
 				buttons |= axis_buttons[2 * i + 1];
 			}
 
 			if(config.qe_sens[i] == -127) {
-				qe_count[i] *= (256.0f / (600.0f * 4.0f));
+				qe_count[i] = qe_temp * (256.0f / (600.0f * 4.0f));
 			} else if(config.qe_sens[i] == -126) {
-				qe_count[i] *= (256.0f / (400.0f * 4.0f));
+				qe_count[i] = qe_temp * (256.0f / (400.0f * 4.0f));
 			} else if(config.qe_sens[i] == -125) {
-				qe_count[i] *= (256.0f / (360.0f * 4.0f));
+				qe_count[i] = qe_temp * (256.0f / (360.0f * 4.0f));
 			} else if(config.qe_sens[i] < 0) {
 				qe_count[i] /= -config.qe_sens[i];
 			} else if(config.qe_sens[i] > 0) {
 				qe_count[i] *= config.qe_sens[i];
 			}
+
 			qe_count[i] -= 128;
 		}
 		
@@ -705,7 +707,7 @@ int main() {
 
 			// Breathing LEDs
 			if(rgb_config.rgb_mode == 1) {
-				if(breathing_leds.update(state_axis[0], state_axis[1])) { 
+				if(breathing_leds.update(axis_state[0], axis_state[1])) { 
 					CRGB temp1 = breathing_leds.get_led(0);
 					CRGB temp2 = breathing_leds.get_led(1);
 					if(config.rgb_mode == 2) {
