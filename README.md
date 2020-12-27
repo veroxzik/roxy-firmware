@@ -42,3 +42,5 @@ NKRO Descriptor and Code from [Dawnmist](https://dawnmist.dreamwidth.org/1250.ht
 Inverted Button Lights inspired by [CrazyRedMachine](https://github.com/CrazyRedMachine/UltimatePopnController)
 
 Encoder routine heavily referenced from [mon's Pocket Voltex](https://github.com/mon/PocketVoltex) and [Paul Stoffregen's Encoder Class](https://github.com/PaulStoffregen/Encoder)
+
+Various assistance (USB Strings, axis button inspiration) from [minsang's arcin fork](https://github.com/minsang-github/arcin-infinitas).
