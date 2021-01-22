@@ -86,7 +86,7 @@ auto konami_conf_desc = configuration_desc(1, 1, 0, 0xc0, 0,
 	// HID interface.
 	interface_desc(0, 0, 1, 0x03, 0x00, 0x00, 0,
 		hid_desc(0x111, 0, 1, 0x22, sizeof(report_desc)),
-		endpoint_desc(0x81, 0x03, 16, 4)
+		endpoint_desc(0x81, 0x03, 16, 1)
 	)
 );
 
@@ -513,6 +513,9 @@ int main() {
 				(Turntable_Leds::Mode)rgb_config.tt_mode, 
 				(Turntable_Leds::SpinType)(rgb_config.tt_spin & 0xF), 
 				(Turntable_Leds::SpinDirection)((rgb_config.tt_spin >> 4) & 0xF));
+			if(rgb_config.tt_mode == Turntable_Leds::Solid) {
+				tt_leds.set_solid(rgb_config.tt_hue, rgb_config.tt_sat, rgb_config.tt_val);
+			}
 			tt_leds.set_brightness(config.rgb_brightness);
 			if(config.rgb_mode == 1) {
 				ws2812b.set_num_leds(rgb_config.tt_num_leds);
@@ -688,12 +691,12 @@ int main() {
 				}
 			}
 			for (int i = 0; i < 2; i++) {
-				if (last_axis_state[i] == 1 && mapping_config.axes_kb_map[2 * i] > 0) {
+				if (axis_state[i] == 1 && mapping_config.axes_kb_map[2 * i] > 0) {
 					nkro.set_key(mapping_config.axes_kb_map[2 * i]);
 				} else {
 					nkro.reset_key(mapping_config.axes_kb_map[2 * i]);
 				}
-				if (last_axis_state[i] == -1 && mapping_config.axes_kb_map[2 * i + 1] > 0) {
+				if (axis_state[i] == -1 && mapping_config.axes_kb_map[2 * i + 1] > 0) {
 					nkro.set_key(mapping_config.axes_kb_map[2 * i + 1]);
 				} else {
 					nkro.reset_key(mapping_config.axes_kb_map[2 * i + 1]);

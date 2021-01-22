@@ -154,14 +154,16 @@ class Turntable_Leds {
 		}
 
 		bool update() {
-			if(mode == Solid) {
-				if(update_required) {
-					update_required = false;
-					return true;
-				} else {
-					return false;
-				}
-			}
+			// 2021-01-16 Known Issue: First array of Solid RGB is incorrect, so we can't rely on a single update.
+			// For now, just push updates at update_speed
+			// if(mode == Solid) {
+			// 	if(update_required) {
+			// 		update_required = false;
+			// 		return true;
+			// 	} else {
+			// 		return false;
+			// 	}
+			// }
 
 			if((Time::time() - last_update) < update_speed) {
 				return false;
