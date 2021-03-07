@@ -73,20 +73,23 @@ class Button_Manager {
             for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
                 if (enabled[i]) {
                     bool read = button_inputs[i].get();
-                    if ((Time::time() - button_time[i]) >= config.debounce_time)
-                    {
-                        if (last_state[i] != read)
-                            button_time[i] = Time::time();
 
-                        if (!read) {
-                            uint8_t shift = mapping[i] > 0 ? mapping[i] - 1 : i;
-                            buttons |= 1 << shift;
+                    // If state is now different
+                    if (last_state[i] != read) {
+                        // Check if debounce has passed
+                        if ((Time::time() - button_time[i]) >= config.debounce_time)
+                        {
+                            // If yes, set new time and set new state
+                            button_time[i] = Time::time();
+                            last_state[i] = read;
                         }
-                        last_state[i] = read;
                     }
-                } else {
-                    // Clear bit if button is disabled
-                    buttons &= ~(1 << i);
+
+                    // State reported is always the last state
+                    if (!last_state[i]) {
+                        uint8_t shift = mapping[i] > 0 ? mapping[i] - 1 : i;
+                            buttons |= 1 << shift;
+                    }
                 }
             }
 
