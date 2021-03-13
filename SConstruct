@@ -9,11 +9,12 @@ SConscript('laks/build_rules')
 env.SelectMCU('stm32f303rc')
 
 arc = ARGUMENTS.get('arcin',0)
+ver = ARGUMENTS.get('version','vTEST')
 if int(arc):
-	env.Append(CPPDEFINES = ['ARCIN'])
+	env.Append(CPPDEFINES = ['ARCIN', {'VERSION' : '\\"\"' + str(ver) + '\\\""'} ])
 	filename = 'arcin-roxy.elf'
 else:
-	env.Append(CPPDEFINES = ['ROXY'])
+	env.Append(CPPDEFINES = ['ROXY', {'VERSION' : '\\\"' + str(ver) + '\\\"'} ])
 	filename = 'roxy.elf'
 
 env.Firmware(filename, Glob('roxy/*.cpp') + Glob('roxy/rgb/*.cpp'), LINK_SCRIPT = 'roxy/roxy.ld')

@@ -246,6 +246,21 @@ class HID_arcin : public USB_HID {
 
 			return true;
 		}
+
+		bool get_version_report() {
+#ifndef VERSION
+#warning "NO VERSION DEFINED, CHANGE BEFORE RELEASE"
+#define VERSION "vTEST"
+#endif
+			uint8_t len = (uint8_t)strlen(VERSION);
+			if(len > 60) {
+				len = 60;
+			}
+			config_report_t version_report = {0xa0, 0, len};
+			memcpy(version_report.data, VERSION, len);
+			usb.write(0, (uint32_t*)&version_report, sizeof(version_report));
+			return true;
+		}
 	
 	public:
 		HID_arcin(USB_generic& usbd, desc_t rdesc) : USB_HID(usbd, rdesc, 0, 1, 64) {}
@@ -323,6 +338,9 @@ class HID_arcin : public USB_HID {
 			switch(report_id) {
 				case 0xc0:
 					return get_feature_config();
+
+				case 0xa0:
+					return get_version_report();
 
 				default:
 					return false;
