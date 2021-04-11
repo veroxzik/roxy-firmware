@@ -25,6 +25,8 @@ Pin ws_data = GPIOC[12];
 
 Pin led1 = GPIOC[4];
 
+Pin ver_check = GPIOC[0];
+
 const char16_t mfg_name[] = u"\u0312VeroxZik";
 const char product_name[] = "Roxy";
 

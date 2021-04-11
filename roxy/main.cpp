@@ -12,6 +12,7 @@
 #include <interrupt/exti.h>
 
 #include "board_define.h"
+#include "board_version.h"
 #include "report_desc.h"
 #include "usb_strings.h"
 #include "configloader.h"
@@ -118,6 +119,11 @@ extern Pin led1;
 #ifdef ARCIN
 extern Pin led2;
 #endif
+#ifdef ROXY
+extern Pin ver_check;
+#endif
+
+Board_Version board_version;
 
 USB_f1 roxy_usb(USB, dev_desc_p, conf_desc_p);
 USB_f1 iidx_usb(USB, iidx_dev_desc_p, konami_conf_desc_p);
@@ -247,7 +253,7 @@ class HID_arcin : public USB_HID {
 			return true;
 		}
 
-		bool get_version_report() {
+		bool get_fw_version_report() {
 #ifndef VERSION
 #warning "NO VERSION DEFINED, CHANGE BEFORE RELEASE"
 #define VERSION "vTEST"
@@ -258,6 +264,26 @@ class HID_arcin : public USB_HID {
 			}
 			config_report_t version_report = {0xa0, 0, len};
 			memcpy(version_report.data, VERSION, len);
+			usb.write(0, (uint32_t*)&version_report, sizeof(version_report));
+			return true;
+		}
+
+		bool get_board_version_report() {
+			config_report_t version_report = {0xa4, 0, 0};
+			switch(board_version.board) {
+				case Board_Version::UNDEF:
+					version_report.size = 9;
+					memcpy(version_report.data, "Undefined", version_report.size);
+					break;
+				case Board_Version::V1_1:
+					version_report.size = 9;
+					memcpy(version_report.data, "Roxy v1.1", version_report.size);
+					break;
+				case Board_Version::V2_0:
+					version_report.size = 9;
+					memcpy(version_report.data, "Roxy v2.0", version_report.size);
+					break;
+			}
 			usb.write(0, (uint32_t*)&version_report, sizeof(version_report));
 			return true;
 		}
@@ -340,7 +366,10 @@ class HID_arcin : public USB_HID {
 					return get_feature_config();
 
 				case 0xa0:
-					return get_version_report();
+					return get_fw_version_report();
+
+				case 0xa4:
+					return get_board_version_report();
 
 				default:
 					return false;
@@ -452,6 +481,9 @@ int main() {
 		led2.on();
 	}
 #endif
+
+	// Get board version
+	board_version.get_version();
 	
 	Axis* axis[2];
 	

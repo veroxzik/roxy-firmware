@@ -290,6 +290,17 @@ auto report_desc = joystick(
 
 	usage(0xd001),
 	report_count(4),
+	feature(0x02),	// Data
+
+	// Firmware version
+	report_id(0xa4),
+
+	usage(0xd000),
+	report_count(2),
+	feature(0x02),	// Command ID
+
+	usage(0xd001),
+	report_count(4),
 	feature(0x02)	// Data
 );
 
