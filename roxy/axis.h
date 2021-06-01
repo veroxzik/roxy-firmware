@@ -59,7 +59,8 @@ class QEAxis : public Axis {
 // https://github.com/mon/PocketVoltex
 class IntAxis : public Axis {
 	private:
-		Pin& a, b;
+		Pin *a;
+		Pin *b;
 		uint32_t count = 0;
 		uint32_t max = 255;
 		uint8_t state;
@@ -67,7 +68,10 @@ class IntAxis : public Axis {
 		bool invert = false;
 
 	public:
-		IntAxis(Pin &_a, Pin &_b) : a(_a), b(_b) {}
+		void set_pins(Pin _a, Pin _b) {
+			a = &(_a);
+			b = &(_b);
+		}
 
 		void enable(bool _invert, int8_t sens) {
 			invert = _invert;
@@ -86,11 +90,11 @@ class IntAxis : public Axis {
 				sens = 256 - 1;
 			}
 
-			state = a.get() | (b.get() << 1);
+			state = a->get() | (b->get() << 1);
 		}
 
 		void updateEncoder() {
-			uint8_t newState = a.get() | (b.get() << 1);
+			uint8_t newState = a->get() | (b->get() << 1);
 			int8_t delta;
 			uint8_t tempState = state | (newState << 2);
 			state = newState;

@@ -1,36 +1,223 @@
 #ifndef BOARD_DEFINE_H
 #define BOARD_DEFINE_H
 
+class Pin_Definition {
+	public:
+		Pin usb_dm = GPIOA[11];
+		Pin usb_dp = GPIOA[12];
+
+		Pin qe1a = GPIOA[0];
+		Pin qe1b = GPIOA[1];
+		Pin qe2a = GPIOA[6];
+		Pin qe2b = GPIOA[7];
+
+		virtual bool has_usb_pullup();
+		virtual Pin get_usb_pullup();
+
+		virtual uint8_t get_num_buttons();
+
+		virtual Pin* get_button_input(uint8_t index);
+		virtual Pin* get_button_led(uint8_t index);
+
+		virtual uint8_t get_num_leds();
+		virtual Pin* get_led(uint8_t index);
+
+		virtual bool has_version_check();
+		virtual Pin* get_version_check();
+};
+
+
+class Roxy_v11_Pins : public Pin_Definition {
+	private:
+		uint8_t num_buttons = 12;
+
+		Pin button_inputs[12] = {
+			GPIOB[4], GPIOB[5], GPIOB[6], GPIOB[9], GPIOC[14], GPIOC[5],
+			GPIOB[1], GPIOB[10], GPIOC[7], GPIOC[9], GPIOA[9], GPIOB[7]};
+		Pin button_leds[12] = {
+			GPIOA[15], GPIOC[11], GPIOB[3], GPIOC[13], GPIOC[15], GPIOB[0],
+			GPIOB[2], GPIOC[6], GPIOC[8], GPIOA[8], GPIOA[10], GPIOB[8]};
+
+		Pin leds[1] = { GPIOC[4] };
+
+		Pin version_pin = GPIOC[0];
+
+		Pin null_pin = GPIOF[4];	// Unused and unconnected
+
+	public:
+		bool has_usb_pullup() {
+			return false;
+		}
+
+		Pin get_usb_pullup() {
+			return null_pin;
+		}
+
+		uint8_t get_num_buttons() {
+			return num_buttons;
+		}
+
+		Pin* get_button_input(uint8_t index) {
+			if(index < num_buttons) {
+				return &button_inputs[index];
+			}
+		}
+
+		Pin* get_button_led(uint8_t index) {
+			if (index < num_buttons) {
+				return &button_leds[index];
+			}
+		}
+
+		uint8_t get_num_leds() {
+			return 1;
+		}
+
+		Pin* get_led(uint8_t index) {
+			return &leds[0];	// Always return the first one
+		}
+
+		bool has_version_check() {
+			return true;
+		}
+
+		Pin* get_version_check() {
+			return &version_pin;
+		}
+};
+
+class Roxy_v20_Pins : public Pin_Definition {
+	private:
+		uint8_t num_buttons = 11;
+
+		Pin button_inputs[11] = {
+			GPIOA[15], GPIOD[2], GPIOB[8], GPIOB[9], GPIOC[14], GPIOC[3],
+			GPIOC[2], GPIOA[4], GPIOA[5], GPIOB[2], GPIOB[10]};
+		Pin button_leds[11] = {
+			GPIOA[8], GPIOA[9], GPIOA[10], GPIOC[11], GPIOC[13], GPIOB[0],
+			GPIOB[1], GPIOC[6], GPIOC[7], GPIOC[8], GPIOC[9]};
+
+		Pin version_pin = GPIOC[0];
+
+		Pin null_pin = GPIOF[4];	// Unused and unconnected
+
+	public:
+		bool has_usb_pullup() {
+			return false;
+		}
+
+		Pin get_usb_pullup() {
+			return null_pin;
+		}
+
+		uint8_t get_num_buttons() {
+			return num_buttons;
+		}
+
+		Pin* get_button_input(uint8_t index) {
+			if(index < num_buttons) {
+				return &button_inputs[index];
+			}
+		}
+
+		Pin* get_button_led(uint8_t index) {
+			if (index < num_buttons) {
+				return &button_leds[index];
+			}
+		}
+
+		uint8_t get_num_leds() {
+			return 0;
+		}
+
+		Pin* get_led(uint8_t index) {
+			return &null_pin;
+		}
+
+		bool has_version_check() {
+			return true;
+		}
+
+		Pin* get_version_check() {
+			return &version_pin;
+		}
+};
+
+class Arcin_Pins : public Pin_Definition {
+	private:
+		Pin usb_pu = GPIOA[15];
+
+		uint8_t num_buttons = 11;
+
+		Pin button_inputs[11] = {
+			GPIOB[0], GPIOB[1], GPIOB[2], GPIOB[3], GPIOB[4], GPIOB[5],
+			GPIOB[6], GPIOB[7], GPIOB[8], GPIOB[9], GPIOB[10]};
+		Pin button_leds[11] = {
+			GPIOC[0], GPIOC[1], GPIOC[2], GPIOC[3], GPIOC[4], GPIOC[5],
+			GPIOC[6], GPIOC[7], GPIOC[8], GPIOC[9], GPIOC[10]};
+
+		Pin leds[2] = { GPIOA[8], GPIOA[9] };
+
+		Pin null_pin = GPIOF[4];	// Unused and unconnected
+
+	public:
+		bool has_usb_pullup() {
+			return true;
+		}
+
+		Pin get_usb_pullup() {
+			return usb_pu;
+		}
+
+		uint8_t get_num_buttons() {
+			return num_buttons;
+		}
+
+		Pin* get_button_input(uint8_t index) {
+			if(index < num_buttons) {
+				return &button_inputs[index];
+			}
+		}
+
+		Pin* get_button_led(uint8_t index) {
+			if (index < num_buttons) {
+				return &button_leds[index];
+			}
+		}
+
+		uint8_t get_num_leds() {
+			return 2;
+		}
+
+		Pin* get_led(uint8_t index) {
+			if(index < 2) {
+				return &leds[index];
+			}
+			return &null_pin;
+		}
+
+		bool has_version_check() {
+			return false;
+		}
+
+		Pin* get_version_check() {
+			return &null_pin;
+		}
+};
+
+
+
 #if defined(ROXY)
-
-Pin usb_dm = GPIOA[11];
-Pin usb_dp = GPIOA[12];
-
-Pin button_inputs[] = {
-  GPIOB[4], GPIOB[5], GPIOB[6], GPIOB[9], GPIOC[14], GPIOC[5],
-  GPIOB[1], GPIOB[10], GPIOC[7], GPIOC[9], GPIOA[9], GPIOB[7]};
-Pin button_leds[] = {
-  GPIOA[15], GPIOC[11], GPIOB[3], GPIOC[13], GPIOC[15], GPIOB[0],
-  GPIOB[2], GPIOC[6], GPIOC[8], GPIOA[8], GPIOA[10], GPIOB[8]};
-
-Pin qe1a = GPIOA[0];
-Pin qe1b = GPIOA[1];
-Pin qe2a = GPIOA[6];
-Pin qe2b = GPIOA[7];
 
 Pin rgb_sck = GPIOC[10];
 Pin rgb_mosi = GPIOC[12];
 
 Pin ws_data = GPIOC[12];
 
-Pin led1 = GPIOC[4];
-
-Pin ver_check = GPIOC[0];
-
 const char16_t mfg_name[] = u"\u0312VeroxZik";
 const char product_name[] = "Roxy";
 
-#define NUM_BUTTONS 12
+#define MAX_BUTTONS 12
 
 const char led_names[][14] = {
 	"Button 1 LED",
@@ -54,23 +241,11 @@ const char led_names[][14] = {
 	"RGB 2 (Blue)"
 };
 
+Roxy_v11_Pins roxy_v11_pins;
+Roxy_v20_Pins roxy_v20_pins;
+Pin_Definition* current_pins = &roxy_v20_pins;
+
 #elif defined(ARCIN)
-
-Pin usb_dm = GPIOA[11];
-Pin usb_dp = GPIOA[12];
-Pin usb_pu = GPIOA[15];
-
-Pin button_inputs[] = {
-  GPIOB[0], GPIOB[1], GPIOB[2], GPIOB[3], GPIOB[4], GPIOB[5],
-  GPIOB[6], GPIOB[7], GPIOB[8], GPIOB[9], GPIOB[10]};
-Pin button_leds[] = {
-  GPIOC[0], GPIOC[1], GPIOC[2], GPIOC[3], GPIOC[4], GPIOC[5],
-  GPIOC[6], GPIOC[7], GPIOC[8], GPIOC[9], GPIOC[10]};
-
-Pin qe1a = GPIOA[0];
-Pin qe1b = GPIOA[1];
-Pin qe2a = GPIOA[6];
-Pin qe2b = GPIOA[7];
 
 // TODO CHANGE TO SHARE PS2 SPI PINS
 Pin rgb_sck = GPIOC[10];
@@ -78,13 +253,10 @@ Pin rgb_mosi = GPIOC[12];
 
 Pin ws_data = GPIOB[8];
 
-Pin led1 = GPIOA[8];
-Pin led2 = GPIOA[9];
-
 const char16_t mfg_name[] = u"\u0308zyp";
 const char product_name[] = "arcin (Roxy fw)";
 
-#define NUM_BUTTONS 11
+#define MAX_BUTTONS 11
 
 const char led_names[][14] = {
 	"Button 1 LED",
@@ -107,6 +279,9 @@ const char led_names[][14] = {
 	"Unused",
   "Unused"
 };
+
+Arcin_Pins arcin_pins;
+Pin_Definition* current_pins = &arcin_pins;
 
 #else
 #error "Board not defined."

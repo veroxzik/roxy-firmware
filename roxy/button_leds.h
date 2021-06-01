@@ -8,6 +8,8 @@
 
 #include "board_define.h"
 
+extern Pin_Definition *current_pins;
+
 #define NUM_STEPS	20
 
 enum LedMode {
@@ -22,13 +24,13 @@ class Button_Leds {
 	private:
 		uint32_t ramp_down_cycles;	// Converted to timer cycles
 		float ramp_down_slope;
-		bool led_on_req[NUM_BUTTONS];
-		uint32_t led_release_time[NUM_BUTTONS];
-		uint32_t led_set_period[NUM_BUTTONS];
-		uint32_t led_current_period[NUM_BUTTONS];
-		uint32_t led_percentage[NUM_BUTTONS];
-		uint32_t cycle_count[NUM_BUTTONS];
-		LedMode led_mode[NUM_BUTTONS];
+		bool led_on_req[MAX_BUTTONS];
+		uint32_t led_release_time[MAX_BUTTONS];
+		uint32_t led_set_period[MAX_BUTTONS];
+		uint32_t led_current_period[MAX_BUTTONS];
+		uint32_t led_percentage[MAX_BUTTONS];
+		uint32_t cycle_count[MAX_BUTTONS];
+		LedMode led_mode[MAX_BUTTONS];
 		
 
 		const uint8_t gamma_input[NUM_STEPS] = {100, 30, 20, 10, 0};
@@ -51,14 +53,14 @@ class Button_Leds {
 		}
 
 		void set_mode(uint8_t index, LedMode mode) {
-			if(index >= NUM_BUTTONS) {
+			if(index >= current_pins->get_num_buttons()) {
 				return;
 			}
 			led_mode[index] = mode;
 		}
 
 		void set_led(uint8_t index, bool state) {
-			if(index >= NUM_BUTTONS) {
+			if(index >= current_pins->get_num_buttons()) {
 				return;
 			}
 
@@ -91,37 +93,37 @@ class Button_Leds {
 			TIM6.SR &= ~(1 << 0);	// Clear UIF
 
 			uint32_t cur_time = Time::time();
-			for(int i=0; i<NUM_BUTTONS; i++) {
+			for(int i=0; i<current_pins->get_num_buttons(); i++) {
 				switch(led_mode[i]) {
 					case LedMode::Standard:
 						if(led_on_req[i]) {
-							button_leds[i].on();
+							current_pins->get_button_led(i)->on();
 						} else {
-							button_leds[i].off();
+							current_pins->get_button_led(i)->off();
 						}
 						break;
 
 					case LedMode::StandardInvert:
 						if(led_on_req[i]) {
-							button_leds[i].off();
+							current_pins->get_button_led(i)->off();
 						} else {
-							button_leds[i].on();
+							current_pins->get_button_led(i)->on();
 						}
 						break;
 
 					case LedMode::FadeOut:
 						if(led_on_req[i]) {
-							button_leds[i].on();
+							current_pins->get_button_led(i)->on();
 						} else if((cur_time - led_release_time[i]) >= (ramp_down_cycles * 20)) {	// Convert cycles to ms
-							button_leds[i].off();
+							current_pins->get_button_led(i)->off();
 						} else {
 							uint32_t elapsed = 20 * (cur_time - led_release_time[i]);	// Get elapsed cycles
 							// Set percentage based on elapsed cycles
 							led_percentage[i] = ramp_down_slope * (float)elapsed + 100;
 							if(led_current_period[i] < led_percentage[i]) {
-								button_leds[i].on();
+								current_pins->get_button_led(i)->on();
 							} else {
-								button_leds[i].off();
+								current_pins->get_button_led(i)->off();
 							}
 							led_current_period[i]++;
 							if(led_current_period[i] >= led_set_period[i]) {
@@ -132,17 +134,17 @@ class Button_Leds {
 
 					case LedMode::FadeOutInvert:
 						if(led_on_req[i]) {
-							button_leds[i].off();
+							current_pins->get_button_led(i)->off();
 						} else if((cur_time - led_release_time[i]) >= (ramp_down_cycles * 20)) {	// Convert cycles to ms
-							button_leds[i].on();
+							current_pins->get_button_led(i)->on();
 						} else {
 							uint32_t elapsed = 20 * (cur_time - led_release_time[i]);	// Get elapsed cycles
 							// Set percentage based on elapsed cycles
 							led_percentage[i] = ramp_down_slope * (float)elapsed + 100;
 							if(led_current_period[i] < led_percentage[i]) {
-								button_leds[i].off();
+								current_pins->get_button_led(i)->off();
 							} else {
-								button_leds[i].on();
+								current_pins->get_button_led(i)->on();
 							}
 							led_current_period[i]++;
 							if(led_current_period[i] >= led_set_period[i]) {
@@ -153,9 +155,9 @@ class Button_Leds {
 
 					case LedMode::Pwm:
 						if(led_current_period[i] < led_percentage[i]) {
-							button_leds[i].on();
+							current_pins->get_button_led(i)->on();
 						} else {
-							button_leds[i].off();
+							current_pins->get_button_led(i)->off();
 						}
 						led_current_period[i]++;
 						if(led_current_period[i] >= led_set_period[i]) {

@@ -97,31 +97,15 @@ desc_t konami_conf_desc_p = {sizeof(konami_conf_desc), (void*)&konami_conf_desc}
 auto sdvx_dev_desc = device_desc(0x200, 0, 0, 0, 64, 0x1ccf, 0x101c, 0x100, 1, 2, 3, 1);
 desc_t sdvx_dev_desc_p = {sizeof(sdvx_dev_desc), (void*)&sdvx_dev_desc};
 
-// Defined in "pin_define.h"
-extern Pin usb_dm;
-extern Pin usb_dp;
-#ifdef ARCIN
-extern Pin usb_pu;
+// Defined in "board_define.h"
+extern Pin_Definition *current_pins;
+#ifdef ROXY
+extern Roxy_v11_Pins roxy_v11_pins;
+extern Roxy_v20_Pins roxy_v20_pins;
 #endif
-
-extern Pin button_inputs[];
-extern Pin button_leds[];
 
 extern Button_Leds button_led_manager;	// In button_leds.h
 Button_Manager button_manager; 	// In button_manager.h
-
-extern Pin qe1a;
-extern Pin qe1b;
-extern Pin qe2a;
-extern Pin qe2b;
-
-extern Pin led1;
-#ifdef ARCIN
-extern Pin led2;
-#endif
-#ifdef ROXY
-extern Pin ver_check;
-#endif
 
 Board_Version board_version;
 
@@ -300,7 +284,7 @@ class HID_arcin : public USB_HID {
 			output_report_t* report = (output_report_t*)buf;
 			
 			last_led_time = Time::time();
-			for (int i = 0; i < NUM_BUTTONS; i++) {
+			for (int i = 0; i < current_pins->get_num_buttons(); i++) {
 				button_led_manager.set_led(i, ((report->leds) >> i & 0x1) ^ ((config.flags >> 7) & 0x1));
 			}
 			
@@ -397,7 +381,7 @@ NullAxis null_axis;
 QEAxis axis_qe1(TIM2);
 QEAxis axis_qe2(TIM3);
 
-IntAxis axis_int(qe1b, qe2b);
+IntAxis axis_int;
 
 template<>
 void interrupt<Interrupt::EXTI1>() {
@@ -439,11 +423,12 @@ int main() {
 	RCC.enable(RCC.GPIOA);
 	RCC.enable(RCC.GPIOB);
 	RCC.enable(RCC.GPIOC);
+	RCC.enable(RCC.GPIOD);
 	
-	usb_dm.set_mode(Pin::AF);
-	usb_dm.set_af(14);
-	usb_dp.set_mode(Pin::AF);
-	usb_dp.set_af(14);
+	current_pins->usb_dm.set_mode(Pin::AF);
+	current_pins->usb_dm.set_af(14);
+	current_pins->usb_dp.set_mode(Pin::AF);
+	current_pins->usb_dp.set_af(14);
 
 	RCC.enable(RCC.USB);
 	
@@ -464,27 +449,33 @@ int main() {
 
 	usb->init();
 
-#ifdef ARCIN
+#if defined(ARCIN)
 	usb_pu.set_mode(Pin::Output);
 	usb_pu.on();
 #endif
 
-	button_manager.init();	
-	
-	led1.set_mode(Pin::Output);
-	if(config.flags & (1 << 3)) {
-		led1.on();
-	}
-#ifdef ARCIN
-	led2.set_mode(Pin::Output);
-	if(config.flags & (1 << 4)) {
-		led2.on();
+#if defined(ROXY)
+	// Get board version
+	board_version.get_version();
+	// Set pins based on version
+	if(board_version.board == Board_Version::V1_1) {
+		current_pins = &roxy_v11_pins;
+	} else if(board_version.board == Board_Version::V2_0) {
+		current_pins = &roxy_v20_pins;
 	}
 #endif
 
-	// Get board version
-	board_version.get_version();
+	button_manager.init();	
 	
+	for(int i = 0; i < current_pins->get_num_leds(); i++) {
+		Pin* led;
+		led = current_pins->get_led(i);
+		led->set_mode(Pin::Output);
+		if(config.flags & (1 << (3 + i))) {
+			led->on();
+		}
+	}
+
 	Axis* axis[2];
 	
 	if(config.flags & (1 << 8)) {
@@ -496,10 +487,11 @@ int main() {
 		EXTI.FTSR1 |= (1 << 1) | (1 << 7);		// Enable falling edge trigger on EXT1 and EXT7
 		Interrupt::enable(Interrupt::EXTI1);	// Enable EXTI1 interrupt
 		Interrupt::enable(Interrupt::EXTI9_5);	// Enable EXTI5-9 interrupt
-		qe1b.set_mode(Pin::Input);
-		qe2b.set_mode(Pin::Input);
-		qe1b.set_pull(Pin::PullUp);
-		qe2b.set_pull(Pin::PullUp);
+		current_pins->qe1b.set_mode(Pin::Input);
+		current_pins->qe2b.set_mode(Pin::Input);
+		current_pins->qe1b.set_pull(Pin::PullUp);
+		current_pins->qe2b.set_pull(Pin::PullUp);
+		axis_int.set_pins(current_pins->qe1b, current_pins->qe1b);
 
 		axis_int.enable(config.flags & (1 << 1), config.qe_sens[0]);
 		
@@ -518,12 +510,12 @@ int main() {
 			
 			axis_qe1.enable(config.flags & (1 << 1), config.qe_sens[0]);
 			
-			qe1a.set_af(1);
-			qe1b.set_af(1);
-			qe1a.set_mode(Pin::AF);
-			qe1b.set_mode(Pin::AF);
-			qe1a.set_pull(Pin::PullUp);
-			qe1b.set_pull(Pin::PullUp);
+			current_pins->qe1a.set_af(1);
+			current_pins->qe1b.set_af(1);
+			current_pins->qe1a.set_mode(Pin::AF);
+			current_pins->qe1b.set_mode(Pin::AF);
+			current_pins->qe1a.set_pull(Pin::PullUp);
+			current_pins->qe1b.set_pull(Pin::PullUp);
 			
 			axis[0] = &axis_qe1;
 		}
@@ -540,12 +532,12 @@ int main() {
 			
 			axis_qe2.enable(config.flags & (1 << 2), config.qe_sens[1]);
 			
-			qe2a.set_af(2);
-			qe2b.set_af(2);
-			qe2a.set_mode(Pin::AF);
-			qe2b.set_mode(Pin::AF);
-			qe2a.set_pull(Pin::PullUp);
-			qe2b.set_pull(Pin::PullUp);
+			current_pins->qe2a.set_af(2);
+			current_pins->qe2b.set_af(2);
+			current_pins->qe2a.set_mode(Pin::AF);
+			current_pins->qe2b.set_mode(Pin::AF);
+			current_pins->qe2a.set_pull(Pin::PullUp);
+			current_pins->qe2b.set_pull(Pin::PullUp);
 			
 			axis[1] = &axis_qe2;
 		}
@@ -733,7 +725,7 @@ int main() {
 
 		// Keyboard
 		if(usb->ep_ready(2) && (config.output_mode == 1 || config.output_mode == 2)) {
-			for (int i = 0; i < NUM_BUTTONS; i++) {
+			for (int i = 0; i < current_pins->get_num_buttons(); i++) {
 				if (buttons & (1 << i) && mapping_config.button_kb_map[i] > 0) {
 					nkro.set_key(mapping_config.button_kb_map[i]);
 				} else {

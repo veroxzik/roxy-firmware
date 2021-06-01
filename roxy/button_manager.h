@@ -9,8 +9,7 @@
 #include "button_leds.h"
 #include "device/device_config.h"
 
-extern Pin button_inputs[];
-extern Pin button_leds[];
+extern Pin_Definition *current_pins;
 extern Button_Leds button_led_manager;
 
 extern config_t config;
@@ -19,14 +18,14 @@ extern device_config_t device_config;
 
 class Button_Manager {
     private:
-        bool enabled[NUM_BUTTONS];
-        uint8_t mapping[NUM_BUTTONS];
-        uint32_t button_time[NUM_BUTTONS];
-	    bool last_state[NUM_BUTTONS];
+        bool enabled[MAX_BUTTONS];
+        uint8_t mapping[MAX_BUTTONS];
+        uint32_t button_time[MAX_BUTTONS];
+	    bool last_state[MAX_BUTTONS];
 
     public:
         void init() {
-            for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
+            for (uint8_t i = 0; i < current_pins->get_num_buttons(); i++) {
                 // Buttons are enabled by default
                 enabled[i] = true;
 
@@ -50,16 +49,16 @@ class Button_Manager {
                 
                 // Continue setting up the button if it has not been disabled
                 if (enabled[i]) {
-                    button_inputs[i].set_mode(Pin::Input);
-                    button_inputs[i].set_pull(Pin::PullUp);
+                    current_pins->get_button_input(i)->set_mode(Pin::Input);
+                    current_pins->get_button_input(i)->set_pull(Pin::PullUp);
 
                     button_time[i] = Time::time();
-                    last_state[i] = button_inputs[i].get();
+                    last_state[i] = current_pins->get_button_input(i)->get();
 
                     mapping[i] = (mapping_config.button_joy_map[i / 2] >> ((i % 2) * 4)) & 0xF;
 
                     // Setup LEDs
-                    button_leds[i].set_mode(Pin::Output);
+                    current_pins->get_button_led(i)->set_mode(Pin::Output);
                     button_led_manager.set_mode(i, (LedMode)((mapping_config.button_led_mode[i / 2] >> ((i % 2) * 4)) & 0xF));
                 }
             }
@@ -70,9 +69,9 @@ class Button_Manager {
         uint16_t read_buttons() {
 		    uint16_t buttons = 0;
 
-            for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
+            for (uint8_t i = 0; i < current_pins->get_num_buttons(); i++) {
                 if (enabled[i]) {
-                    bool read = button_inputs[i].get();
+                    bool read = current_pins->get_button_input(i)->get();
 
                     // If state is now different
                     if (last_state[i] != read) {
@@ -97,7 +96,7 @@ class Button_Manager {
         }
 
         void set_leds_reactive() {
-            for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
+            for (uint8_t i = 0; i < current_pins->get_num_buttons(); i++) {
                 if (enabled[i]) {
                     button_led_manager.set_led(i, !last_state[i] ^ ((config.flags >> 7) & 0x1));
                 }
