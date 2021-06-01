@@ -7,6 +7,9 @@
 #include <usb/descriptor.h>
 #include <usb/hid.h>
 
+#define ROXY_V20
+//#define ROXY_V11
+
 static uint32_t& reset_reason = *(uint32_t*)0x10000000;
 static const uint32_t* firmware_vtors = (uint32_t*)0x8002000;
 
@@ -59,14 +62,23 @@ desc_t report_desc_p = {sizeof(report_desc), (void*)&report_desc};
 static Pin usb_dm = GPIOA[11];
 static Pin usb_dp = GPIOA[12];
 
+#if defined(ROXY_V20)
 static Pin button_inputs[] = {
+  GPIOA[15], GPIOD[2], GPIOB[8], GPIOB[9], GPIOC[14], GPIOC[3],
+  GPIOC[2], GPIOA[4], GPIOA[5], GPIOB[2], GPIOB[10]};
+static Pin button_leds[] = {
+  GPIOA[8], GPIOA[9], GPIOA[10], GPIOC[11], GPIOC[13], GPIOB[0],
+  GPIOB[1], GPIOC[6], GPIOC[7], GPIOC[8], GPIOC[9]};
+#define NUM_BUTTONS 11
+#elif defined(ROXY_V11)
+ static Pin button_inputs[] = {
   GPIOB[4], GPIOB[5], GPIOB[6], GPIOB[9], GPIOC[14], GPIOC[5],
   GPIOB[1], GPIOB[10], GPIOC[7], GPIOC[9], GPIOA[9], GPIOB[7]};
 static Pin button_leds[] = {
   GPIOA[15], GPIOC[11], GPIOB[3], GPIOC[13], GPIOC[15], GPIOB[0],
   GPIOB[2], GPIOC[6], GPIOB[8], GPIOA[8], GPIOA[10], GPIOB[8]};
-
-static Pin led1 = GPIOC[4];
+#define NUM_BUTTONS 12
+#endif
 
 USB_f1 usb(USB, dev_desc_p, conf_desc_p);
 
@@ -282,14 +294,12 @@ int main() {
 	RCC.enable(RCC.GPIOB);
 	RCC.enable(RCC.GPIOC);
 	
-	for (int i = 0; i < 12; i++) {
+	for (int i = 0; i < NUM_BUTTONS; i++) {
 		button_inputs[i].set_mode(Pin::Input);
 		button_inputs[i].set_pull(Pin::PullUp);
 		
 		button_leds[i].set_mode(Pin::Output);
 	}
-	
-	led1.set_mode(Pin::Output);
 	
 	if(normal_boot()) {
 		chainload(0x8002000);
