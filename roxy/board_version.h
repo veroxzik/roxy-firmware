@@ -64,4 +64,6 @@ class Board_Version {
         }
 };
 
+Board_Version board_version;
+
 #endif

@@ -6,12 +6,19 @@
 #include <gpio/gpio.h>
 #include <spi/spi.h>
 
+#include "../board_version.h"
+
 extern Pin rgb_mosi;
+extern Pin spi1_mosi;
 
 class TLC5973 {
 	private:
 		uint16_t buf[52];
 		uint8_t brightness;
+		SPI_t *spi;
+		DMA_t *dma;
+		uint8_t dma_chan;
+		Interrupt::IRQ interrupt;
 		volatile bool busy;
 		bool enabled = false;
 
@@ -40,49 +47,78 @@ class TLC5973 {
 
 	public:
 		void init() {
-			enabled = true;
+			if(board_version.board == Board_Version::V2_0) {
+				enabled = true;
+				RCC.enable(RCC.SPI1);
+				RCC.enable(RCC.DMA1);
 
-			RCC.enable(RCC.SPI3);
-			RCC.enable(RCC.DMA2);
+				spi = &SPI1;
+				dma = &DMA1;
+				dma_chan = 2;
 
+				// Setup DMA
+				interrupt = Interrupt::DMA1_Channel3;
+				Interrupt::enable(interrupt);
+
+				// Set pins
+				spi1_mosi.set_mode(Pin::AF);
+				spi1_mosi.set_af(5);
+				spi1_mosi.set_type(Pin::PushPull);
+				spi1_mosi.set_pull(Pin::PullNone);
+				spi1_mosi.set_speed(Pin::High);
+
+			} else if(board_version.board == Board_Version::V1_1) {
+				enabled = true;
+				RCC.enable(RCC.SPI3);
+				RCC.enable(RCC.DMA2);
+
+				spi = &SPI3;
+				dma = &DMA2;
+				dma_chan = 1;
+
+				// Setup DMA
+				interrupt = Interrupt::DMA2_Channel2;
+				Interrupt::enable(interrupt);
+
+				// Set pins
+				rgb_mosi.set_mode(Pin::AF);
+				rgb_mosi.set_af(6);
+				rgb_mosi.set_type(Pin::PushPull);
+				rgb_mosi.set_pull(Pin::PullNone);
+				rgb_mosi.set_speed(Pin::High);
+
+			} else {
+				return;
+			}
 			set_command_buffer();
 
-			rgb_mosi.set_mode(Pin::AF);
-			rgb_mosi.set_af(6);
-			rgb_mosi.set_type(Pin::PushPull);
-			rgb_mosi.set_pull(Pin::PullNone);
-			rgb_mosi.set_speed(Pin::High);
-
-			// Setup DMA
-			Interrupt::enable(Interrupt::DMA2_Channel2);
-
-			SPI3.reg.CR2 = 	(7 < 8) |	// DS = 8bit
+			spi->reg.CR2 = 	(7 < 8) |	// DS = 8bit
 							(1 << 1);	// TX DMA Enabled
 			// CR1: LSBFIRST = 0 (default, MSBFIRST),  CPOL = 0 (default), CPHA = 0 (default)
-			SPI3.reg.CR1 = (1 << 9) | (1 << 8 ) | (4 << 3) | (1 << 2);	
+			spi->reg.CR1 = (1 << 9) | (1 << 8 ) | (4 << 3) | (1 << 2);
 			// SSM = 1, SSI = 1, BR = 4 (FpCLK/32), MSTR = 1
 
 			// CRC = default (not used anyway)
-			SPI3.reg.CRCPR = 7;
+			spi->reg.CRCPR = 7;
 
 			// Enable (SPE = 1)
-			SPI3.reg.CR1 |= (1 << 6);
+			spi->reg.CR1 |= (1 << 6);
 		}
 
 		void schedule_dma()  {
 			busy = true;
 
-			DMA2.reg.C[1].NDTR = 52;
-			DMA2.reg.C[1].MAR = (uint32_t)&buf;
-			DMA2.reg.C[1].PAR = (uint32_t)&SPI3.reg.DR;
-			DMA2.reg.C[1].CR = 	(1 << 10) |	// MSIZE = 16-bits
-								(1 << 8) | 	// PSIZE = 16-bits
-								(1 << 7) |	// Memory increment mode enabled
-								(0 << 6) | 	// Peripheral increment mode disabled
-								//(1 << 5) | 	// Circular mode enabled
-								(1 << 4) |	// Direction: read from memory
-								(1 << 1) |	// Transfer complete interrupt enable
-								(1 << 0);
+			dma->reg.C[dma_chan].NDTR = 52;
+			dma->reg.C[dma_chan].MAR = (uint32_t)&buf;
+			dma->reg.C[dma_chan].PAR = (uint32_t)&(spi->reg.DR);
+			dma->reg.C[dma_chan].CR = 	(1 << 10) |	// MSIZE = 16-bits
+										(1 << 8) | 	// PSIZE = 16-bits
+										(1 << 7) |	// Memory increment mode enabled
+										(0 << 6) | 	// Peripheral increment mode disabled
+										//(1 << 5) | 	// Circular mode enabled
+										(1 << 4) |	// Direction: read from memory
+										(1 << 1) |	// Transfer complete interrupt enable
+										(1 << 0);
 		}
 
 		void set_led_8bit(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
@@ -102,13 +138,13 @@ class TLC5973 {
 			brightness = b;
 		}
 
-		void irq() {
-			if(!enabled) {
+		void irq(Interrupt::IRQ _interrupt) {
+			if(!enabled || _interrupt != interrupt) {
 				return;
 			}
 
-			DMA2.reg.C[1].CR = 0;	// Disable channel
-			DMA2.reg.IFCR = (1 << 4);	// Clears all interrupt flags for Channel 2
+			dma->reg.C[dma_chan].CR = 0;	// Disable channel
+			dma->reg.IFCR = (1 << (4 * dma_chan));	// Clears all interrupt flags for this selected channel
 
 			busy = false;
 		}

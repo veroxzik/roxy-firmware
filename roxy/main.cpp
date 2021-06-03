@@ -107,7 +107,7 @@ extern Roxy_v20_Pins roxy_v20_pins;
 extern Button_Leds button_led_manager;	// In button_leds.h
 Button_Manager button_manager; 	// In button_manager.h
 
-Board_Version board_version;
+extern Board_Version board_version;	// In board_version.h
 
 USB_f1 roxy_usb(USB, dev_desc_p, conf_desc_p);
 USB_f1 iidx_usb(USB, iidx_dev_desc_p, konami_conf_desc_p);
@@ -145,7 +145,12 @@ template <>
 void interrupt<Interrupt::DMA2_Channel2>() {
 	tcleds.irq();
 	tlc59711.irq();
-	tlc5973.irq();
+	tlc5973.irq(Interrupt::DMA2_Channel2);
+}
+
+template<>
+void interrupt<Interrupt::DMA1_Channel3>() {
+	tlc5973.irq(Interrupt::DMA1_Channel3);
 }
 
 class HID_arcin : public USB_HID {

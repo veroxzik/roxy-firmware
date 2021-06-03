@@ -212,6 +212,9 @@ class Arcin_Pins : public Pin_Definition {
 Pin rgb_sck = GPIOC[10];
 Pin rgb_mosi = GPIOC[12];
 
+Pin spi1_sck = GPIOB[3];
+Pin spi1_mosi = GPIOB[5];
+
 Pin ws_data = GPIOC[12];
 
 const char16_t mfg_name[] = u"\u0312VeroxZik";
@@ -250,6 +253,10 @@ Pin_Definition* current_pins = &roxy_v20_pins;
 // TODO CHANGE TO SHARE PS2 SPI PINS
 Pin rgb_sck = GPIOC[10];
 Pin rgb_mosi = GPIOC[12];
+
+// UNUSED, just here so it builds
+Pin spi1_sck = GPIOB[3];
+Pin spi1_mosi = GPIOB[5];
 
 Pin ws_data = GPIOB[8];
 
