@@ -1,5 +1,5 @@
-#ifndef WS2812B_H
-#define WS2812B_H
+#ifndef WS2812B_TIMER_H
+#define WS2812B_TIMER_H
 
 #include <rcc/rcc.h>
 #include <gpio/gpio.h>
