@@ -60,10 +60,17 @@ class Button_Leds {
 			ramp_down_slope = -100.0f / (float)ramp_down_cycles;
 
 			// TEMP
+			led_type[0] = LedType::TypeRGB;
+			led_type[1] = LedType::TypeRGB;
 			led_type[2] = LedType::TypeRGB;
 			rgb_buttons.init();
 			rgb_buttons.set_brightness(255);
+			rgb_buttons.set_color(0, 14);
+			rgb_buttons.set_color(1, 65);
 			rgb_buttons.set_color(2, 200);
+			rgb_buttons.enable(0);
+			rgb_buttons.enable(1);
+			rgb_buttons.enable(2);
 		}
 
 		void set_mode(uint8_t index, LedMode mode) {
@@ -122,7 +129,6 @@ class Button_Leds {
 				
 				case LedType::TypeRGB:
 					rgb_buttons.set_brightness(index, 255);
-					rgb_buttons.update(index);
 					break;
 			}
 		}
@@ -139,7 +145,6 @@ class Button_Leds {
 				
 				case LedType::TypeRGB:
 					rgb_buttons.set_brightness(index, 0);
-					rgb_buttons.update(index);
 					break;
 			}
 		}
@@ -176,7 +181,6 @@ class Button_Leds {
 								}
 							} else if(led_type[i] == LedType::TypeRGB) {
 								rgb_buttons.set_brightness(i, (float)led_percentage[i] / (float)led_set_period[i] * 255.0);
-								rgb_buttons.update(i);
 							}
 							led_current_period[i]++;
 							if(led_current_period[i] >= led_set_period[i]) {
@@ -202,7 +206,6 @@ class Button_Leds {
 								}
 							} else if(led_type[i] == LedType::TypeRGB) {
 								rgb_buttons.set_brightness(i, 255.0 - ((float)led_percentage[i] / (float)led_set_period[i] * 255.0));
-								rgb_buttons.update(i);
 							}
 							led_current_period[i]++;
 							if(led_current_period[i] >= led_set_period[i]) {
@@ -233,6 +236,7 @@ Button_Leds button_led_manager;
 template<>
 void interrupt<Interrupt::TIM6>() {
 	button_led_manager.irq();
+	rgb_buttons.irq();
 }
 
 #endif
