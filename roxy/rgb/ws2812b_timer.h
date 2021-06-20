@@ -15,7 +15,7 @@
 
 extern Pin ws_data;
 
-class WS2812B {
+class WS2812B_Timer {
 	private:
 		uint32_t rgb_data[MAX_LEDS];
 		uint8_t dmabuf[26];

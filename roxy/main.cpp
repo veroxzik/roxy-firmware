@@ -22,7 +22,7 @@
 #include "axis.h"
 #include "nkro_keyboard.h"
 #include "rgb/rgb_config.h"
-#include "rgb/ws2812b.h"
+#include "rgb/ws2812b_timer.h"
 #include "rgb/tlc59711.h"
 #include "rgb/tlc5973.h"
 #include "rgb/pixeltypes.h"
@@ -113,17 +113,17 @@ USB_f1 roxy_usb(USB, dev_desc_p, conf_desc_p);
 USB_f1 iidx_usb(USB, iidx_dev_desc_p, konami_conf_desc_p);
 USB_f1 sdvx_usb(USB, sdvx_dev_desc_p, konami_conf_desc_p);
 
-WS2812B ws2812b;	// In rgb/ws2812b.h
+WS2812B_Timer ws2812b_timer;	// In rgb/ws2812b_timer.h
 
 #if defined(ROXY)
 template <>
 void interrupt<Interrupt::DMA2_Channel1>() {
-	ws2812b.irq();
+	ws2812b_timer.irq();
 }
 #elif defined(ARCIN)
 template <>
 void interrupt<Interrupt::DMA1_Channel7>() {
-	ws2812b.irq();
+	ws2812b_timer.irq();
 }
 #endif
 
@@ -295,7 +295,7 @@ class HID_arcin : public USB_HID {
 			
 			switch (config.rgb_mode) {
 				case 1:
-					ws2812b.update(report->r1, report->g1, report->b1);
+					ws2812b_timer.update(report->r1, report->g1, report->b1);
 					break;
 				case 2:
 					switch (rgb_config.rgb_mode) {
@@ -565,7 +565,7 @@ int main() {
 			}
 			tt_leds.set_brightness(config.rgb_brightness);
 			if(config.rgb_mode == 1) {
-				ws2812b.set_num_leds(rgb_config.tt_num_leds);
+				ws2812b_timer.set_num_leds(rgb_config.tt_num_leds);
 			}
 			break;
 	}
@@ -573,7 +573,7 @@ int main() {
 	// Set RGB Interfaces
 	switch(config.rgb_mode) {
 		case 1:
-			ws2812b.init();
+			ws2812b_timer.init();
 			break;
 		case 2:
 			switch(rgb_config.rgb_mode) {
@@ -780,7 +780,7 @@ int main() {
 				if(config.rgb_mode == 1) {
 					uint8_t num_leds = tt_leds.get_num_leds();
 					for(uint8_t i = 0; i < num_leds; i++) {
-						ws2812b.set_led(i, leds[i].r, leds[i].g, leds[i].b, i == (num_leds - 1));
+						ws2812b_timer.set_led(i, leds[i].r, leds[i].g, leds[i].b, i == (num_leds - 1));
 					}
 				}
 			}
