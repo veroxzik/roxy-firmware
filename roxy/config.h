@@ -39,6 +39,10 @@ struct mapping_config_t {
 									// 2 = Fade out
 									// 3 = Fade out (Invert)
 	uint16_t button_led_fade_time;	// Time in ms
+	uint8_t button_led_type[6];		// 1 nibble per button
+									// 0 = Standard LED
+									// 1 = mintyLED (inverted ws2812b)
+									// 2 = Standard ws2812b
 };
 
 #endif

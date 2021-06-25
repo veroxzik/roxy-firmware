@@ -33,6 +33,7 @@ class Rgb_Buttons {
         uint8_t dmabuf[26];
         CRGB temp_color;
         bool init_pin_set;
+        bool init_run;
         volatile uint32_t* dma_src;
         volatile uint8_t current_led = 0;
         volatile Timer current_timer;
@@ -194,6 +195,11 @@ class Rgb_Buttons {
 
     public:
         void init() {
+            if(init_run) {
+                return;
+            }
+            init_run = true;
+
             RCC.enable(RCC.TIM1);
             RCC.enable(RCC.TIM8);
             RCC.enable(RCC.DMA1);
@@ -229,6 +235,8 @@ class Rgb_Buttons {
 			TIM8.BDTR = 1 << 15;	// Main output enable
 
             TIM8.CR1 = 1 << 0;      // Enable counter
+
+            set_brightness(255);
         }
 
         void enable(uint8_t index) {
@@ -273,10 +281,6 @@ class Rgb_Buttons {
 
             if(led_color[index].v != temp) {
                 led_color[index].v = temp;
-                // // TEMP CODE FOR EFFECT
-                // if(temp == 255) {
-                //     add_color(index, 36);
-                // }
                 need_update[index] = true;
             }
         }

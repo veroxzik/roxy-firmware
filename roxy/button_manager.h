@@ -60,6 +60,7 @@ class Button_Manager {
                     // Setup LEDs
                     current_pins->get_button_led(i)->set_mode(Pin::Output);
                     button_led_manager.set_mode(i, (LedMode)((mapping_config.button_led_mode[i / 2] >> ((i % 2) * 4)) & 0xF));
+                    button_led_manager.set_type(i, (LedType)((mapping_config.button_led_type[i / 2] >> ((i % 2) * 4)) & 0xF));
                 }
             }
 

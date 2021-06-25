@@ -40,7 +40,6 @@ class Button_Leds {
 		LedMode led_mode[MAX_BUTTONS];
 		LedType led_type[MAX_BUTTONS];
 		
-
 		const uint8_t gamma_input[NUM_STEPS] = {100, 30, 20, 10, 0};
 		uint8_t timing_positions[NUM_STEPS];
 		uint8_t value_positions[NUM_STEPS];
@@ -58,19 +57,6 @@ class Button_Leds {
 
 			ramp_down_cycles = ramp_down * 20;	// Input (ms) converted to timer cycles (20 per ms)
 			ramp_down_slope = -100.0f / (float)ramp_down_cycles;
-
-			// TEMP
-			led_type[0] = LedType::TypeRGB;
-			led_type[1] = LedType::TypeRGB;
-			led_type[2] = LedType::TypeRGB;
-			rgb_buttons.init();
-			rgb_buttons.set_brightness(255);
-			rgb_buttons.set_color(0, 14);
-			rgb_buttons.set_color(1, 65);
-			rgb_buttons.set_color(2, 200);
-			rgb_buttons.enable(0);
-			rgb_buttons.enable(1);
-			rgb_buttons.enable(2);
 		}
 
 		void set_mode(uint8_t index, LedMode mode) {
@@ -78,6 +64,18 @@ class Button_Leds {
 				return;
 			}
 			led_mode[index] = mode;
+		}
+
+		void set_type(uint8_t index, uint8_t type, uint8_t color = 0) {
+			if(index >= current_pins->get_num_buttons()) {
+				return;
+			}
+			if(type > 0) {
+				rgb_buttons.init();
+				led_type[index] = LedType::TypeRGB;
+				rgb_buttons.enable(index);
+				rgb_buttons.set_color(index, color);
+			}
 		}
 
 		void set_led(uint8_t index, bool state) {
