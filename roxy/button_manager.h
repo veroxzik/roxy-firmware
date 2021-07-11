@@ -8,6 +8,7 @@
 #include "config.h"
 #include "button_leds.h"
 #include "device/device_config.h"
+#include "rgb/rgb_config.h"
 
 extern Pin_Definition *current_pins;
 extern Button_Leds button_led_manager;
@@ -15,6 +16,7 @@ extern Button_Leds button_led_manager;
 extern config_t config;
 extern mapping_config_t mapping_config;
 extern device_config_t device_config;
+extern rgb_config_t rgb_config;
 
 class Button_Manager {
     private:
@@ -60,7 +62,7 @@ class Button_Manager {
                     // Setup LEDs
                     current_pins->get_button_led(i)->set_mode(Pin::Output);
                     button_led_manager.set_mode(i, (LedMode)((mapping_config.button_led_mode[i / 2] >> ((i % 2) * 4)) & 0xF));
-                    button_led_manager.set_type(i, (LedType)((mapping_config.button_led_type[i / 2] >> ((i % 2) * 4)) & 0xF));
+                    button_led_manager.set_type(i, (LedType)((mapping_config.button_led_type[i / 2] >> ((i % 2) * 4)) & 0xF), rgb_config.led_hue[i]);
                 }
             }
 

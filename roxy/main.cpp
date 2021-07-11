@@ -215,8 +215,7 @@ class HID_arcin : public USB_HID {
 				memcpy(mapping_report.data, &mapping_config, sizeof(mapping_config));
 				usb.write(0, (uint32_t*)&mapping_report, sizeof(mapping_report));
 				config_id = 3;
-			}
-			else {
+			} else {
 				config_report_t device_report = {0xc0, 3, sizeof(device_config)};
 				memcpy(device_report.data, &device_config, sizeof(device_config));
 				usb.write(0, (uint32_t*)&device_report, sizeof(device_report));

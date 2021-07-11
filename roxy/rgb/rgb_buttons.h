@@ -44,7 +44,6 @@ class Rgb_Buttons {
         void schedule_dma() {
             cnt--;
 
-            // TODO: Only TIM1 supported
             if(current_timer == Timer1) {
                 DMA1.reg.C[4].NDTR = 26;
                 DMA1.reg.C[4].MAR = (uint32_t)&dmabuf;

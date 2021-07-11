@@ -17,6 +17,7 @@ struct rgb_config_t {
     uint8_t tt_sat;
     uint8_t tt_val;
     uint8_t tt_spin;
+    uint8_t led_hue[12];
 };
 
 #endif
