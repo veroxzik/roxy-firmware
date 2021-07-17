@@ -15,7 +15,10 @@ struct config_t {
 						// Bit 7:	Invert light signals (always on, press or HID turns them off)
 						// Bit 8:	Enable QE pair mode (divert QE1B and QE2B to X Axis)
 	int8_t qe_sens[2];
-	uint8_t ps2_mode;
+	uint8_t ps2_mode;	// 0: Disabled
+						// 1: Pop'n Music
+						// 2: IIDX (QE1 for TT)
+						// 3: IIDX (QE2 for TT)
 	uint8_t rgb_mode;
 	uint8_t rgb_brightness;
 	uint8_t debounce_time;

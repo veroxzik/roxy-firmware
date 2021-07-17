@@ -21,6 +21,8 @@
 #include "button_manager.h"
 #include "axis.h"
 #include "nkro_keyboard.h"
+#include "spi_ps.h"
+
 #include "rgb/rgb_config.h"
 #include "rgb/ws2812b_timer.h"
 #include "rgb/ws2812b_spi.h"
@@ -487,8 +489,8 @@ int main() {
 		}
 	}
 
+	// Configure QE / Analog
 	Axis* axis[2];
-	
 	if(config.flags & (1 << 8)) {
 		// Setup interrupts on pins PA1 and PA7
 		RCC.enable(RCC.SYSCFG);	// Enable SYSCFG
@@ -552,6 +554,11 @@ int main() {
 			
 			axis[1] = &axis_qe2;
 		}
+	}
+
+	// Initialize Playstation Mode
+	if(config.ps2_mode > 0) {
+		spi_ps.init();
 	}
 
 	// Initialize RGB modes
@@ -706,9 +713,10 @@ int main() {
 				}
 			}
 
-			if(axis_state[i] == 1 && config.flags & (1 << 6)) {
+			// Translate axis to buttons if enabled, or if IIDX PS2 mode is on
+			if(axis_state[i] == 1 && (config.flags & (1 << 6) || config.ps2_mode == 2)) {
 				buttons |= axis_buttons[2 * i];
-			} else if(axis_state[i] == -1 && config.flags & (1 << 6)) {
+			} else if(axis_state[i] == -1 && (config.flags & (1 << 6) || config.ps2_mode == 3)) {
 				buttons |= axis_buttons[2 * i + 1];
 			}
 
@@ -728,6 +736,11 @@ int main() {
 		}
 		
 		input_report_t report = {1, buttons, uint8_t(qe_count[0]), uint8_t(qe_count[1])};
+
+		// PS2 (if enabled)
+		if(config.ps2_mode > 0) {
+			spi_ps.set_buttons(buttons);
+		}
 			
 		// Joystick
 		if(usb->ep_ready(1) && (config.output_mode == 0 || config.output_mode == 2)) {

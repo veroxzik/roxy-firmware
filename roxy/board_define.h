@@ -217,6 +217,12 @@ Pin spi1_mosi = GPIOB[5];
 
 Pin ws_data = GPIOC[12];
 
+Pin ps_ack = GPIOB[11];
+Pin ps_ss = GPIOB[12];
+Pin ps_sck = GPIOB[13];
+Pin ps_miso = GPIOB[14];
+Pin ps_mosi = GPIOB[15];
+
 const char16_t mfg_name[] = u"\u0312VeroxZik";
 const char product_name[] = "Roxy";
 
@@ -259,6 +265,12 @@ Pin spi1_sck = GPIOB[3];
 Pin spi1_mosi = GPIOB[5];
 
 Pin ws_data = GPIOB[8];
+
+Pin ps_ack = GPIOB[11];
+Pin ps_ss = GPIOB[12];
+Pin ps_sck = GPIOB[13];
+Pin ps_miso = GPIOB[14];
+Pin ps_mosi = GPIOB[15];
 
 const char16_t mfg_name[] = u"\u0308zyp";
 const char product_name[] = "arcin (Roxy fw)";
