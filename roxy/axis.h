@@ -7,8 +7,111 @@
 #include <os/time.h>
 
 class Axis {
+	private:
+		uint32_t axis_sustain_start;
+		uint32_t axis_debounce_start;
+
+		uint32_t axis_time = 0;
+		uint32_t last_axis = 0;
+		int8_t last_axis_stae = 0;
+
+		uint8_t axis_debounce_time = 0;
+		uint8_t axis_sustain_time = 0;
+
+		uint8_t reduction_ratio = 0;
+
+		float deadzone_angle = 0.0f;	// Deadzone before movement from idle is registered
+		uint32_t idle_count = 0;		// Count after movement has stopped for some time
+
+	protected:
+		uint16_t max_count = 255;
+		int8_t sensitivity = 0;
+
 	public:
+		uint32_t count;
+		int8_t dir_state = 0;
+
 		virtual uint32_t get() = 0;
+
+		void set_config(uint8_t _debounce, uint8_t _sustain, uint8_t _reduction, uint8_t _deadzone) {
+			axis_debounce_time = _debounce;
+			axis_sustain_time = _sustain;
+			reduction_ratio = _reduction;
+			deadzone_angle = (float)_deadzone / 2.0f;
+		}
+
+		void process() {
+			uint32_t current_time = Time::time();
+			count = get();
+
+			// Perform reduction
+			uint32_t qe_temp = count;
+			if(reduction_ratio > 0) {
+				qe_temp = uint32_t((float)count / (4.0f * float(reduction_ratio) * 0.5f + 1.0f));
+				qe_temp = uint32_t((float)qe_temp * (4.0f * float(reduction_ratio) * 0.5f + 1.0f));
+			}
+
+			// Get delta
+			int8_t delta = qe_temp - last_axis;
+			float delta_angle = (float)delta / (float)max_count * 360.0f;
+
+			// Logic:
+			// If QE was stationary and is now moving, change must exceed deadzone
+			// If QE was moving and is now stationary, it sustains for a set time / resets deadzone
+			// If QE was moving and is now moving in the opposite direction, it changes if the duration is past the debounce
+
+			if(dir_state == 0 && delta > 0) {
+				if(delta_angle >= deadzone_angle) {
+					last_axis = qe_temp;
+					dir_state = 1;
+				}
+			} else if(dir_state == 0 && delta < 0) {
+				if(delta_angle <= -deadzone_angle) {
+					last_axis = qe_temp;
+					dir_state = -1;
+				}
+			} else if(dir_state != 0 && delta == 0) {
+				if(dir_state == 1 || dir_state == -1) {
+					axis_sustain_start = current_time;
+					dir_state *= 2;
+					last_axis = qe_temp;
+				} else {
+					if((current_time - axis_sustain_start) > axis_sustain_time) {
+						dir_state = 0;
+					}
+				}
+			} else {
+				if((dir_state == 1 && delta == -1) || 
+				(dir_state == -1 && delta == 1)) {
+					axis_debounce_start = current_time;
+					dir_state *= 2;
+				} else {
+					if((current_time - axis_debounce_start) > axis_debounce_time) {
+						if(delta > 0) {
+							dir_state = 1;
+						} else if(delta < 0) {
+							dir_state = -1;
+							
+						}
+					}
+					last_axis = qe_temp;
+				}
+			}
+
+			if(sensitivity == -127) {
+				count = last_axis * (256.0f / (600.0f * 4.0f));
+			} else if(sensitivity == -126) {
+				count = last_axis * (256.0f / (400.0f * 4.0f));
+			} else if(sensitivity == -125) {
+				count = last_axis * (256.0f / (360.0f * 4.0f));
+			} else if(sensitivity < 0) {
+				count = last_axis / -sensitivity;
+			} else if(sensitivity > 0) {
+				count = last_axis * sensitivity;
+			}
+
+			count -= 128;
+		}
 };
 
 class NullAxis : public Axis {
@@ -48,6 +151,8 @@ class QEAxis : public Axis {
 			} else {
 				tim.ARR = 256 - 1;
 			}
+			sensitivity = sens;
+			max_count = tim.ARR;
 		}
 		
 		virtual uint32_t get() final {
@@ -62,7 +167,6 @@ class IntAxis : public Axis {
 		Pin *a;
 		Pin *b;
 		uint32_t count = 0;
-		uint32_t max = 255;
 		uint8_t state;
 
 		bool invert = false;
@@ -78,17 +182,18 @@ class IntAxis : public Axis {
 
 			if(sens < 0) {
 				if(sens == -127) {
-					max = (600 * 4) - 1;
+					max_count = (600 * 4) - 1;
 				} else if(sens == -126) {
-					max = (400 * 4) - 1;
+					max_count = (400 * 4) - 1;
 				} else if(sens == -125) {
-					max = (360 * 4) - 1;
+					max_count = (360 * 4) - 1;
 				} else {
-					max = 256 * -sens - 1;
+					max_count = 256 * -sens - 1;
 				}
 			} else {
-				sens = 256 - 1;
+				max_count = 256 - 1;
 			}
+			sensitivity = sens;
 
 			state = a->get() | (b->get() << 1);
 		}
@@ -121,11 +226,11 @@ class IntAxis : public Axis {
 					break;
 			}
 			if(((int16_t)count + delta) < 0) {
-				count += max;
+				count += max_count;
 			}
 			count += delta;
-			if(count >= max) {
-				count -= max;
+			if(count >= max_count) {
+				count -= max_count;
 			}
 
 		}

@@ -344,6 +344,8 @@ int main() {
 			axis[1] = &axis_qe2;
 		}
 	}
+	axis[0]->set_config(config.axis_debounce_time, config.axis_sustain_time, config.reduction_ratio[0], config.deadzone_angle[0]);
+	axis[1]->set_config(config.axis_debounce_time, config.axis_sustain_time, config.reduction_ratio[1], config.deadzone_angle[1]);
 
 	// Initialize Playstation Mode
 	if(config.ps2_mode > 0) {
@@ -408,15 +410,15 @@ int main() {
 		tcleds.init();
 	}
 
-	int8_t axis_state[2] = {0, 0};				// Current axis state
-	uint32_t axis_sustain_start[2] = {0, 0};	// Clock time a sustain is started
-	uint32_t axis_debounce_start[2] = {0, 0};
+	// int8_t axis_state[2] = {0, 0};				// Current axis state
+	// uint32_t axis_sustain_start[2] = {0, 0};	// Clock time a sustain is started
+	// uint32_t axis_debounce_start[2] = {0, 0};
 
-	uint32_t axis_time[2] = {0, 0};
-	uint8_t last_axis[2] = {0, 0};
+	// uint32_t axis_time[2] = {0, 0};
+	// uint8_t last_axis[2] = {0, 0};
 	
-	int8_t last_axis_state[2] = {0, 0};
-	uint32_t qe_count[2] = {0, 0};
+	// int8_t last_axis_state[2] = {0, 0};
+	// uint32_t qe_count[2] = {0, 0};
 	uint32_t axis_buttons[4] = {(1 << 12), (1 << 13), (1 << 14), (1 << 15)};
 
 	while(1) {
@@ -436,55 +438,11 @@ int main() {
 		}	
 		
 		for(int i = 0; i < 2; i++) {
-			// Get new count
-			qe_count[i] = axis[i]->get();
+			// Process axis
+			axis[i]->process();
 
-			// Perform reduction
-			uint32_t qe_temp = qe_count[i];
-			if(config.reduction_ratio[i] > 0) {
-				qe_temp = uint32_t((float)qe_count[i] / (4.0f * float(config.reduction_ratio[i]) * 0.5f + 1.0f));
-				qe_temp = uint32_t((float)qe_temp * (4.0f * float(config.reduction_ratio[i]) * 0.5f + 1.0f));
-			}
-
-			// Get delta
-			int8_t delta = qe_temp - last_axis[i];
-			last_axis[i] = qe_temp;
-
-			// Logic:
-			// If QE was stationary and is now moving, change is instant
-			// If QE was moving and is now stationary, it sustains for a set time
-			// If QE was moving and is now moving in the opposite direction, it changes if the duration is past the debounce
-
-			if(axis_state[i] == 0 && delta > 0) {
-				axis_state[i] = 1;
-			} else if(axis_state[i] == 0 && delta < 0) {
-				axis_state[i] = -1;
-			} else if(axis_state[i] != 0 && delta == 0) {
-				if(axis_state[i] == 1 || axis_state[i] == -1) {
-					axis_sustain_start[i] = current_time;
-					axis_state[i] *= 2;
-				} else {
-					if((current_time - axis_sustain_start[i]) > config.axis_sustain_time) {
-						axis_state[i] = 0;
-					}
-				}
-			} else {
-				if((axis_state[i] == 1 && delta == -1) || 
-				(axis_state[i] == -1 && delta == 1)) {
-					axis_debounce_start[i] = current_time;
-					axis_state[i] *= 2;
-				} else {
-					if((current_time - axis_debounce_start[i]) > config.axis_debounce_time) {
-						if(delta > 0) {
-							axis_state[i] = 1;
-						} else if(delta < 0) {
-							axis_state[i] = -1;
-						}
-					}
-				}
-			}
-
-			if(axis_state[i] > 0) {
+			// Set lights and/or buttons
+			if(axis[i]->dir_state > 0) {
 				sdvx_leds.set_active(i, true);
 				if(i == rgb_config.tt_axis) {
 					tt_leds.set_direction(Turntable_Leds::CW);
@@ -492,7 +450,7 @@ int main() {
 				if(config.flags & (1 << 6)) {
 					buttons |= axis_buttons[2 * i];
 				}
-			} else if(axis_state[i] < 0) {
+			} else if(axis[i]->dir_state < 0) {
 				sdvx_leds.set_active(i, false);
 				if(i == rgb_config.tt_axis) {
 					tt_leds.set_direction(Turntable_Leds::CCW);
@@ -503,28 +461,14 @@ int main() {
 			}
 
 			// Translate axis to buttons if enabled, or if IIDX PS2 mode is on
-			if(axis_state[i] == 1 && (config.flags & (1 << 6) || config.ps2_mode == 2)) {
+			if(axis[i]->dir_state == 1 && (config.flags & (1 << 6) || config.ps2_mode == 2)) {
 				buttons |= axis_buttons[2 * i];
-			} else if(axis_state[i] == -1 && (config.flags & (1 << 6) || config.ps2_mode == 3)) {
+			} else if(axis[i]->dir_state == -1 && (config.flags & (1 << 6) || config.ps2_mode == 3)) {
 				buttons |= axis_buttons[2 * i + 1];
 			}
-
-			if(config.qe_sens[i] == -127) {
-				qe_count[i] = qe_temp * (256.0f / (600.0f * 4.0f));
-			} else if(config.qe_sens[i] == -126) {
-				qe_count[i] = qe_temp * (256.0f / (400.0f * 4.0f));
-			} else if(config.qe_sens[i] == -125) {
-				qe_count[i] = qe_temp * (256.0f / (360.0f * 4.0f));
-			} else if(config.qe_sens[i] < 0) {
-				qe_count[i] /= -config.qe_sens[i];
-			} else if(config.qe_sens[i] > 0) {
-				qe_count[i] *= config.qe_sens[i];
-			}
-
-			qe_count[i] -= 128;
 		}
 		
-		input_report_t report = {1, buttons, uint8_t(qe_count[0]), uint8_t(qe_count[1])};
+		input_report_t report = {1, buttons, uint8_t(axis[0]->count), uint8_t(axis[1]->count)};
 
 		// PS2 (if enabled)
 		if(config.ps2_mode > 0) {
@@ -546,12 +490,12 @@ int main() {
 				}
 			}
 			for (int i = 0; i < 2; i++) {
-				if (axis_state[i] == 1 && mapping_config.axes_kb_map[2 * i] > 0) {
+				if (axis[i]->dir_state == 1 && mapping_config.axes_kb_map[2 * i] > 0) {
 					nkro.set_key(mapping_config.axes_kb_map[2 * i]);
 				} else {
 					nkro.reset_key(mapping_config.axes_kb_map[2 * i]);
 				}
-				if (axis_state[i] == -1 && mapping_config.axes_kb_map[2 * i + 1] > 0) {
+				if (axis[i]->dir_state == -1 && mapping_config.axes_kb_map[2 * i + 1] > 0) {
 					nkro.set_key(mapping_config.axes_kb_map[2 * i + 1]);
 				} else {
 					nkro.reset_key(mapping_config.axes_kb_map[2 * i + 1]);
@@ -565,7 +509,7 @@ int main() {
 
 			// Breathing LEDs
 			if(rgb_config.rgb_mode == 1) {
-				if(breathing_leds.update(axis_state[0], axis_state[1])) { 
+				if(breathing_leds.update(axis[0]->dir_state, axis[1]->dir_state)) { 
 					CRGB temp1 = breathing_leds.get_led(0);
 					CRGB temp2 = breathing_leds.get_led(1);
 					if(config.rgb_mode == 2) {

@@ -29,6 +29,7 @@ struct config_t {
 							// 2: Joystick + Keyboard
 	uint8_t reduction_ratio[2];
 	uint8_t axis_sustain_time;
+	uint8_t deadzone_angle[2];	// Deadzone angle measured in 0.5 deg
 };
 
 struct mapping_config_t {
