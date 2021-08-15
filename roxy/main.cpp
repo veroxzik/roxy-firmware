@@ -461,9 +461,9 @@ int main() {
 			}
 
 			// Translate axis to buttons if enabled, or if IIDX PS2 mode is on
-			if(axis[i]->dir_state == 1 && (config.flags & (1 << 6) || config.ps2_mode == 2)) {
+			if(axis[i]->dir_state > 0 && (config.flags & (1 << 6) || config.ps2_mode == 2 || config.ps2_mode == 3)) {
 				buttons |= axis_buttons[2 * i];
-			} else if(axis[i]->dir_state == -1 && (config.flags & (1 << 6) || config.ps2_mode == 3)) {
+			} else if(axis[i]->dir_state < 0 && (config.flags & (1 << 6) || config.ps2_mode == 2 || config.ps2_mode == 3)) {
 				buttons |= axis_buttons[2 * i + 1];
 			}
 		}

@@ -53,49 +53,76 @@ class Axis {
 
 			// Get delta
 			int8_t delta = qe_temp - last_axis;
+			// Detect rollover
+			if ((last_axis > (max_count / 2)) && qe_temp < (max_count / 4)) {
+				delta += max_count;
+			}
 			float delta_angle = (float)delta / (float)max_count * 360.0f;
 
 			// Logic:
 			// If QE was stationary and is now moving, change must exceed deadzone
 			// If QE was moving and is now stationary, it sustains for a set time / resets deadzone
-			// If QE was moving and is now moving in the opposite direction, it changes if the duration is past the debounce
+			// If QE was moving and is now moving in the opposite direction, change must exceed deadzone to trigger
 
-			if(dir_state == 0 && delta > 0) {
-				if(delta_angle >= deadzone_angle) {
-					last_axis = qe_temp;
-					dir_state = 1;
-				}
-			} else if(dir_state == 0 && delta < 0) {
-				if(delta_angle <= -deadzone_angle) {
-					last_axis = qe_temp;
-					dir_state = -1;
-				}
-			} else if(dir_state != 0 && delta == 0) {
-				if(dir_state == 1 || dir_state == -1) {
-					axis_sustain_start = current_time;
-					dir_state *= 2;
-					last_axis = qe_temp;
-				} else {
-					if((current_time - axis_sustain_start) > axis_sustain_time) {
+			switch(dir_state) {
+				case 0:   // Not moving
+					// Deadzone goes here
+					if(delta > 0 && delta_angle >= deadzone_angle) {
+						last_axis = qe_temp;
+						dir_state = 1;
+					} else if(delta < 0 && delta_angle <= -deadzone_angle) {
+						last_axis = qe_temp;
+						dir_state = -1;
+					}
+					break;
+				case 1:   // Started moving CW
+					if(delta == 0) {
+						axis_sustain_start = current_time;
+						last_axis = qe_temp;
+						dir_state = 2;
+					} else if(delta < 0 && delta_angle <= -deadzone_angle) {
+						last_axis = qe_temp;
+						dir_state = -1;
+					} else if(delta > 0) {
+						last_axis = qe_temp;
+					}
+					break;
+				case 2:   // Sustaining CW
+					if(delta <= 0 && ((current_time - axis_sustain_start) > axis_sustain_time)) {
+						last_axis = qe_temp;
 						dir_state = 0;
+					} else if(delta > 0) {
+						axis_sustain_start = current_time;
+						last_axis = qe_temp;
+					} else if(delta < 0 && delta_angle <= -deadzone_angle) {
+						last_axis = qe_temp;
+						dir_state = -1;
 					}
-				}
-			} else {
-				if((dir_state == 1 && delta == -1) || 
-				(dir_state == -1 && delta == 1)) {
-					axis_debounce_start = current_time;
-					dir_state *= 2;
-				} else {
-					if((current_time - axis_debounce_start) > axis_debounce_time) {
-						if(delta > 0) {
-							dir_state = 1;
-						} else if(delta < 0) {
-							dir_state = -1;
-							
-						}
+					break;
+				case -1:  // Started moving CCW
+					if(delta == 0) {
+						axis_sustain_start = current_time;
+						last_axis = qe_temp;
+						dir_state = -2;
+					} else if(delta > 0 && delta_angle >= deadzone_angle) {
+						last_axis = qe_temp;
+						dir_state = 1;
+					} else if(delta < 0) {
+						last_axis = qe_temp;
 					}
-					last_axis = qe_temp;
-				}
+					break;
+				case -2:  // Sustaining CCW
+					if(delta >= 0 && ((current_time - axis_sustain_start) > axis_sustain_time)) {
+						last_axis = qe_temp;
+						dir_state = 0;
+					} else if(delta < 0) {
+						axis_sustain_start = current_time;
+						last_axis = qe_temp;
+					} else if(delta > 0 && delta_angle >= deadzone_angle) {
+						last_axis = qe_temp;
+						dir_state = 1;
+					}
+					break;
 			}
 
 			if(sensitivity == -127) {
