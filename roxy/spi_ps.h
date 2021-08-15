@@ -31,6 +31,7 @@ class SPI_PS {
         bool enabled;
         uint8_t state;
         uint16_t button_state;
+        uint16_t button_cache;  // Cached value of buttons to ensure a transmission stays consistent
 
         bool process_data(uint8_t data) {
             bool ack = false;
@@ -56,12 +57,12 @@ class SPI_PS {
                     break;
                 case 2:
                     // Lower byte button state
-                    SPI2.reg.DR8 = (uint8_t)(button_state & 0xFF);
+                    SPI2.reg.DR8 = (uint8_t)(button_cache & 0xFF);
                     ack = true;
                     break;
                 case 3:
                     // Upper byte button state
-                    SPI2.reg.DR8 = (uint8_t)((button_state >> 8) & 0xFF);
+                    SPI2.reg.DR8 = (uint8_t)((button_cache >> 8) & 0xFF);
                     ack = true;
                     break;
                 case 4:
@@ -250,6 +251,7 @@ class SPI_PS {
                     }
                     break;
             }
+            button_cache = button_state;
         }
 
         void irq() {
