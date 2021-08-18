@@ -91,7 +91,7 @@ class Roxy_v20_Pins : public Pin_Definition {
 		uint8_t num_buttons = 11;
 
 		Pin button_inputs[11] = {
-			GPIOA[15], GPIOD[2], GPIOB[8], GPIOB[9], GPIOC[14], GPIOC[3],
+			GPIOA[15], GPIOD[2], GPIOC[14], GPIOC[15], GPIOC[1], GPIOC[3],
 			GPIOC[2], GPIOA[4], GPIOA[5], GPIOB[2], GPIOB[10]};
 		Pin button_leds[11] = {
 			GPIOA[8], GPIOA[9], GPIOA[10], GPIOC[11], GPIOC[13], GPIOB[0],
