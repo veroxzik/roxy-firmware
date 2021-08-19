@@ -18,18 +18,31 @@
 // LED11 = TIM8 CH4 - PC9  - AF4
 
 // Roxy v1.1 assignments:
-// LED1 = TIM8 CH1  - PA15 - AF2
+// LED1 = TIM8 CH1  - PA15 - AF2 (Overlap with LED8)
 // LED2 = TIM8 CH2N - PC11 - AF4
 // LED3 = TIM8 CH1N - PB3  - AF4
 // LED4 = TIM1 CH1N - PC13 - AF4
 // LED5 = NONE      - PC15
 // LED6 = TIM1 CH2N - PB0  - AF6
 // LED7 = NONE      - PB2
-// LED8 = TIM8 CH1  - PC6  - AF4
+// LED8 = TIM8 CH1  - PC6  - AF4 (Overlap with LED1)
 // LED9 = TIM8 CH3  - PC8  - AF4
 // LED10 = TIM1 CH1 - PA8  - AF6
 // LED11 = TIM1 CH3 - PA10 - AF6
 // LED12 = TIM8 CH2 - PB8  - AF10
+
+// Arcin assignments:
+// LED1 = NONE       - PC0
+// LED2 = NONE       - PC1
+// LED3 = NONE       - PC2
+// LED4 = NONE       - PC3
+// LED5 = NONE       - PC4
+// LED6 = NONE       - PC5
+// LED7 = TIM8 CH1   - PC6  - AF4
+// LED8 = TIM8 CH2   - PC7  - AF4
+// LED9 = TIM8 CH3   - PC8  - AF4
+// LED10 = TIM8 CH4  - PC9  - AF4
+// LED11 = TIM8 CH1N - PC10 - AF4
 
 #include "../board_define.h"
 #include "hsv2rgb.h"
