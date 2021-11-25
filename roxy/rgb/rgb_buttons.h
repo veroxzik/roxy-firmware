@@ -4,7 +4,7 @@
 // This class manages all RGB buttons on the controller.
 // Commands are directed from the Button LED Manager.
 
-// Roxy v2.0 assignments:
+// Roxy v2.0 Assignments:
 // LED1 = TIM1 CH1  - PA8  - AF6
 // LED2 = TIM1 CH2  - PA9  - AF6
 // LED3 = TIM1 CH3  - PA10 - AF6
@@ -17,34 +17,22 @@
 // LED10 = TIM8 CH3 - PC8  - AF4
 // LED11 = TIM8 CH4 - PC9  - AF4
 
-// Roxy v1.1 assignments:
-// LED1 = TIM8 CH1  - PA15 - AF2 (Overlap with LED8)
-// LED2 = TIM8 CH2N - PC11 - AF4
-// LED3 = TIM8 CH1N - PB3  - AF4
-// LED4 = TIM1 CH1N - PC13 - AF4
-// LED5 = NONE      - PC15
-// LED6 = TIM1 CH2N - PB0  - AF6
-// LED7 = NONE      - PB2
-// LED8 = TIM8 CH1  - PC6  - AF4 (Overlap with LED1)
-// LED9 = TIM8 CH3  - PC8  - AF4
-// LED10 = TIM1 CH1 - PA8  - AF6
-// LED11 = TIM1 CH3 - PA10 - AF6
-// LED12 = TIM8 CH2 - PB8  - AF10
-
-// Arcin assignments:
-// LED1 = NONE       - PC0
-// LED2 = NONE       - PC1
-// LED3 = NONE       - PC2
-// LED4 = NONE       - PC3
-// LED5 = NONE       - PC4
-// LED6 = NONE       - PC5
-// LED7 = TIM8 CH1   - PC6  - AF4
-// LED8 = TIM8 CH2   - PC7  - AF4
-// LED9 = TIM8 CH3   - PC8  - AF4
-// LED10 = TIM8 CH4  - PC9  - AF4
-// LED11 = TIM8 CH1N - PC10 - AF4
+// Roxy v1.1 Assignments
+// LED1  =             PA15 - CANNOT USE
+// LED2  = TIM8 CH2N - PC11 - AF4
+// LED3  = TIM8 CH1N - PB3  - AF4
+// LED4  = TIM1 CH1N - PC13 - AF4
+// LED5  =             PC15 - CANNOT USE
+// LED6  = TIM1 CH2N - PB0  - AF6
+// LED7  =             PB2  - CANNOT USE
+// LED8  = TIM8 CH1  - PC6  - AF4
+// LED9  = TIM8 CH3  - PC8  - AF4
+// LED10 = TIM1 CH1  - PA8  - AF6
+// LED11 = TIM1 CH3  - PA10 - AF6
+// LED12 = TIM8 CH2  - PB8  - AF10
 
 #include "../board_define.h"
+#include "../board_version.h"
 #include "hsv2rgb.h"
 
 class Rgb_Buttons {
@@ -138,17 +126,32 @@ class Rgb_Buttons {
             if(state) {
                 uint8_t af = 4;
                 current_timer = Timer8;
-                switch(index) {
-                    case 0:
-                    case 1:
-                    case 2:
-                    case 5:
-                    case 6:
-                        af = 6;
-                        current_timer = Timer1;
-                        break;
-                    default:
-                        break;
+                if(board_version.board == Board_Version::V2_0) {
+                    switch(index) {
+                        case 0:
+                        case 1:
+                        case 2:
+                        case 5:
+                        case 6:
+                            af = 6;
+                            current_timer = Timer1;
+                            break;
+                        default:
+                            break;
+                    }
+                } else if(board_version.board == Board_Version::V1_1) {
+                    switch(index) {
+                        case 5:
+                        case 9:
+                        case 10:
+                            af = 6;
+                            current_timer = Timer1;
+                            break;
+                        case 11:
+                            af = 10;
+                        default:
+                            break;
+                    }
                 }
                 current_pins->get_button_led(index)->set_af(af);
                 current_pins->get_button_led(index)->set_mode(Pin::AF);
@@ -167,55 +170,105 @@ class Rgb_Buttons {
             }
             TIM1.CCER = 0;
             TIM8.CCER = 0;
-            switch(index) {
-                case 0:
-                    TIM1.CCER = (1 << 1) | (1 << 0);    // CC1 output enable, invert polarity
-                    dma_src = &TIM1.CCR1;
-                    break;
-                case 1:
-                    TIM1.CCER = (1 << 5) | (1 << 4);    // CC2 output enable, invert polarity
-                    dma_src = &TIM1.CCR2;
-                    break;
-                case 2:
-                    TIM1.CCER = (1 << 9) | (1 << 8);    // CC3 output enable, invert polarity
-                    dma_src = &TIM1.CCR3;
-                    break;
-                case 3:
-                    TIM8.CCER = (1 << 7) | (1 << 6);    // CC2N output enable, invert polarity
-                    dma_src = &TIM8.CCR2;
-                    break;
-                case 4:
-                    TIM1.CCER = (1 << 3) | (1 << 2);    // CC1N output enable, invert polarity
-                    dma_src = &TIM1.CCR1;
-                    break;
-                case 5:
-                    TIM1.CCER = (1 << 7) | (1 << 6);    // CC2N output enable, invert polarity
-                    dma_src = &TIM1.CCR2;
-                    break;
-                case 6:
-                    TIM1.CCER = (1 << 11) | (1 << 10);  // CC3N output enable, invert polarity
-                    dma_src = &TIM1.CCR3;
-                    break;
-                case 7:
-                    TIM8.CCER = (1 << 1) | (1 << 0);    // CC1 output enable, invert polarity
-                    dma_src = &TIM8.CCR1;
-                    break;
-                case 8:
-                    TIM8.CCER = (1 << 5) | (1 << 4);    // CC2 output enable, invert polarity
-                    dma_src = &TIM8.CCR2;
-                    break;
-                case 9:
-                    TIM8.CCER = (1 << 9) | (1 << 8);    // CC3 output enable, invert polarity
-                    dma_src = &TIM8.CCR3;
-                    break;
-                case 10:
-                    TIM8.CCER = (1 << 13) | (1 << 12);    // CC4 output enable, invert polarity
-                    dma_src = &TIM8.CCR4;
-                    break;
-                case 11:
-                    break;
+            if(board_version.board == Board_Version::V2_0) {
+                switch(index) {
+                    case 0:
+                        TIM1.CCER = (1 << 1) | (1 << 0);    // CC1 output enable, invert polarity
+                        dma_src = &TIM1.CCR1;
+                        break;
+                    case 1:
+                        TIM1.CCER = (1 << 5) | (1 << 4);    // CC2 output enable, invert polarity
+                        dma_src = &TIM1.CCR2;
+                        break;
+                    case 2:
+                        TIM1.CCER = (1 << 9) | (1 << 8);    // CC3 output enable, invert polarity
+                        dma_src = &TIM1.CCR3;
+                        break;
+                    case 3:
+                        TIM8.CCER = (1 << 7) | (1 << 6);    // CC2N output enable, invert polarity
+                        dma_src = &TIM8.CCR2;
+                        break;
+                    case 4:
+                        TIM1.CCER = (1 << 3) | (1 << 2);    // CC1N output enable, invert polarity
+                        dma_src = &TIM1.CCR1;
+                        break;
+                    case 5:
+                        TIM1.CCER = (1 << 7) | (1 << 6);    // CC2N output enable, invert polarity
+                        dma_src = &TIM1.CCR2;
+                        break;
+                    case 6:
+                        TIM1.CCER = (1 << 11) | (1 << 10);  // CC3N output enable, invert polarity
+                        dma_src = &TIM1.CCR3;
+                        break;
+                    case 7:
+                        TIM8.CCER = (1 << 1) | (1 << 0);    // CC1 output enable, invert polarity
+                        dma_src = &TIM8.CCR1;
+                        break;
+                    case 8:
+                        TIM8.CCER = (1 << 5) | (1 << 4);    // CC2 output enable, invert polarity
+                        dma_src = &TIM8.CCR2;
+                        break;
+                    case 9:
+                        TIM8.CCER = (1 << 9) | (1 << 8);    // CC3 output enable, invert polarity
+                        dma_src = &TIM8.CCR3;
+                        break;
+                    case 10:
+                        TIM8.CCER = (1 << 13) | (1 << 12);    // CC4 output enable, invert polarity
+                        dma_src = &TIM8.CCR4;
+                        break;
+                    case 11:
+                        // DOES NOT EXIST
+                        break;
+                }
+            } else if(board_version.board == Board_Version::V1_1) {
+                switch(index) {
+                    case 0:
+                        // CANNOT USE
+                        break;
+                    case 1:
+                        TIM8.CCER = (1 << 7) | (1 << 6);    // CC2N output enable, invert polarity
+                        dma_src = &TIM8.CCR2;
+                        break;
+                    case 2:
+                        TIM8.CCER = (1 << 3) | (1 << 2);    // CC1N output enable, invert polarity
+                        dma_src = &TIM8.CCR2;
+                        break;
+                    case 3:
+                        TIM1.CCER = (1 << 3) | (1 << 2);    // CC1N output enable, invert polarity
+                        dma_src = &TIM1.CCR1;
+                        break;
+                    case 4:
+                        // CANNNOT USE
+                        break;
+                    case 5:
+                        TIM1.CCER = (1 << 7) | (1 << 6);    // CC2N output enable, invert polarity
+                        dma_src = &TIM1.CCR2;
+                        break;
+                    case 6:
+                        // CANNOT USE
+                        break;
+                    case 7:
+                        TIM8.CCER = (1 << 1) | (1 << 0);    // CC1 output enable, invert polarity
+                        dma_src = &TIM8.CCR1;
+                        break;
+                    case 8:
+                        TIM8.CCER = (1 << 9) | (1 << 8);    // CC3 output enable, invert polarity
+                        dma_src = &TIM8.CCR3;
+                        break;
+                    case 9:
+                        TIM1.CCER = (1 << 1) | (1 << 0);    // CC1 output enable, invert polarity
+                        dma_src = &TIM1.CCR1;
+                        break;
+                    case 10:
+                        TIM1.CCER = (1 << 9) | (1 << 8);    // CC3 output enable, invert polarity
+                        dma_src = &TIM1.CCR3;
+                        break;
+                    case 11:
+                        TIM8.CCER = (1 << 5) | (1 << 4);    // CC2 output enable, invert polarity
+                        dma_src = &TIM8.CCR2;
+                        break;
+                }
             }
-
         }
 
     public:
