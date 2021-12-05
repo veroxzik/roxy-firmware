@@ -135,6 +135,8 @@ class Axis {
 				count = last_axis / -sensitivity;
 			} else if(sensitivity > 0) {
 				count = last_axis * sensitivity;
+			} else {
+				count = last_axis;
 			}
 
 			count -= 128;
@@ -277,17 +279,19 @@ class AnalogAxis : public Axis {
 		
 		void enable() {
 			// Turn on ADC regulator.
-			adc.CR = 0 << 28;
-			adc.CR = 1 << 28;
-			Time::sleep(2);
+			adc.CR &= ~((1 << 28) | (1 << 29));	// Reset ADVREGEN
+			adc.CR |= 1 << 28;	// Turn on ADVREGEN
+			Time::sleep(2);		// Wait for regulator to turn on
 			
 			// Calibrate ADC.
-			// TODO
+			adc.CR &= ~(1 << 30);	// ADCALDIF = 0 (single ended)
+			adc.CR |= 1 << 31;	// Enable ADCAL
+			while(!(adc.CR & (1 << 31)));	// Wait for ADCAL to finish
 			
 			// Configure continous capture on one channel.
 			adc.CFGR = (1 << 13) | (1 << 12) | (1 << 5); // CONT, OVRMOD, ALIGN
 			adc.SQR1 = (ch << 6);
-			adc.SMPR1 = (7 << (ch * 3)); // 72 MHz / 64 / 614 = apx. 1.8 kHz
+			// adc.SMPR1 = (7 << (ch * 3)); // 72 MHz / 64 / 614 = apx. 1.8 kHz
 			
 			// Enable ADC.
 			adc.CR |= 1 << 0; // ADEN

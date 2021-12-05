@@ -209,8 +209,8 @@ extern NKRO_Keyboard nkro;	// In "nkro_keyboard.h"
 int main() {
 	rcc_init();
 	
-	// Set ADC12PRES to /64.
-	RCC.CFGR2 |= (0x19 << 4);
+	// Set ADC12PRES to /1
+	RCC.CFGR2 |= (0x10 << 4);
 	
 	// Initialize system timer.
 	STK.LOAD = 72000000 / 8 / 1000; // 1000 Hz.
