@@ -252,8 +252,8 @@ int main() {
 	usb->init();
 
 #if defined(ARCIN)
-	usb_pu.set_mode(Pin::Output);
-	usb_pu.on();
+	current_pins->get_usb_pullup().set_mode(Pin::Output);
+	current_pins->get_usb_pullup().on();
 #endif
 
 #if defined(ROXY)
