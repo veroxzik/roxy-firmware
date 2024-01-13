@@ -272,7 +272,7 @@ class AnalogAxis : public Axis {
 		uint32_t ch;
 		int8_t delta;
 
-		void smoothing_function() {
+		void sampleQe() {
 			const uint16_t qe_samples = 1000;
 
 			for (uint16_t sample = 0; sample < qe_samples; ++sample) {
@@ -318,7 +318,7 @@ class AnalogAxis : public Axis {
 		}
 
 		virtual void process() {
-			smoothing_function();
+			sampleQe();
 
 			if(delta > 0) {
 				dir_state = 1;

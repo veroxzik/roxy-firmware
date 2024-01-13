@@ -412,8 +412,6 @@ int main() {
 
 	uint32_t axis_buttons[4] = {(1 << 12), (1 << 13), (1 << 14), (1 << 15)};
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "EndlessLoop"
 	while(1) {
 		usb->process();
 		
@@ -551,5 +549,4 @@ int main() {
 			}
 		}
 	}
-#pragma clang diagnostic pop
 }
