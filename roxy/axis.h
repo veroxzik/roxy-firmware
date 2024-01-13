@@ -12,8 +12,7 @@ class Axis {
 		uint32_t axis_debounce_start;
 
 		uint32_t axis_time = 0;
-		uint32_t last_axis = 0;
-		int8_t last_axis_stae = 0;
+		int8_t last_axis_state = 0;
 
 		uint8_t axis_debounce_time = 0;
 		uint8_t axis_sustain_time = 0;
@@ -26,6 +25,7 @@ class Axis {
 	protected:
 		uint16_t max_count = 255;
 		int8_t sensitivity = 0;
+		uint32_t last_axis = 0;
 
 	public:
 		uint32_t count;
@@ -37,10 +37,10 @@ class Axis {
 			axis_debounce_time = _debounce;
 			axis_sustain_time = _sustain;
 			reduction_ratio = _reduction;
-			deadzone_angle = (float)_deadzone / 2.0f;
+			deadzone_angle = _deadzone / 2.0f;
 		}
 
-		void process() {
+		virtual void process() {
 			uint32_t current_time = Time::time();
 			count = get();
 
@@ -138,8 +138,6 @@ class Axis {
 			} else {
 				count = last_axis;
 			}
-
-			count -= 128;
 		}
 };
 
@@ -261,7 +259,6 @@ class IntAxis : public Axis {
 			if(count >= max_count) {
 				count -= max_count;
 			}
-
 		}
 
 		virtual uint32_t get() final {
@@ -273,7 +270,21 @@ class AnalogAxis : public Axis {
 	private:
 		ADC_t& adc;
 		uint32_t ch;
-	
+		int8_t delta;
+
+		void smoothing_function() {
+			const uint16_t qe_samples = 1000;
+
+			for (uint16_t sample = 0; sample < qe_samples; ++sample) {
+				count += get();
+			}
+
+			count /= qe_samples;
+
+		    delta = last_axis - count;
+			last_axis = count;
+		}
+
 	public:
 		AnalogAxis(ADC_t& a, uint32_t c) : adc(a), ch(c) {}
 		
@@ -282,28 +293,52 @@ class AnalogAxis : public Axis {
 			adc.CR &= ~((1 << 28) | (1 << 29));	// Reset ADVREGEN
 			adc.CR |= 1 << 28;	// Turn on ADVREGEN
 			Time::sleep(2);		// Wait for regulator to turn on
-			
+
 			// Calibrate ADC.
 			adc.CR &= ~(1 << 30);	// ADCALDIF = 0 (single ended)
 			adc.CR |= 1 << 31;	// Enable ADCAL
 			while(!(adc.CR & (1 << 31)));	// Wait for ADCAL to finish
-			
-			// Configure continous capture on one channel.
+
+			// Configure continuous capture on one channel.
 			adc.CFGR = (1 << 13) | (1 << 12) | (1 << 5); // CONT, OVRMOD, ALIGN
 			adc.SQR1 = (ch << 6);
 			// adc.SMPR1 = (7 << (ch * 3)); // 72 MHz / 64 / 614 = apx. 1.8 kHz
-			
+
 			// Enable ADC.
 			adc.CR |= 1 << 0; // ADEN
 			while(!(adc.ISR & (1 << 0))); // ADRDY
 			adc.ISR = (1 << 0); // ADRDY
-			
+
 			// Start conversion.
 			adc.CR |= 1 << 2; // ADSTART
 		}
 		
 		virtual uint32_t get() final {
 			return adc.DR >> 8;
+		}
+
+		virtual void process() {
+			smoothing_function();
+
+			if(delta > 0) {
+				dir_state = 1;
+			} else if(delta < 0) {
+				dir_state = -1;
+			} else {
+				dir_state = 0;
+			}
+
+			if(sensitivity == -127) {
+				count *= (256.0f / (600.0f * 4.0f));
+			} else if(sensitivity == -126) {
+				count *= (256.0f / (400.0f * 4.0f));
+			} else if(sensitivity == -125) {
+				count *= (256.0f / (360.0f * 4.0f));
+			} else if(sensitivity < 0) {
+				count /= -sensitivity;
+			} else if(sensitivity > 0) {
+				count *= sensitivity;
+			}
 		}
 };
 

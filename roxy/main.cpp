@@ -410,20 +410,12 @@ int main() {
 		tcleds.init();
 	}
 
-	// int8_t axis_state[2] = {0, 0};				// Current axis state
-	// uint32_t axis_sustain_start[2] = {0, 0};	// Clock time a sustain is started
-	// uint32_t axis_debounce_start[2] = {0, 0};
-
-	// uint32_t axis_time[2] = {0, 0};
-	// uint8_t last_axis[2] = {0, 0};
-	
-	// int8_t last_axis_state[2] = {0, 0};
-	// uint32_t qe_count[2] = {0, 0};
 	uint32_t axis_buttons[4] = {(1 << 12), (1 << 13), (1 << 14), (1 << 15)};
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "EndlessLoop"
 	while(1) {
 		usb->process();
-		uint32_t current_time = Time::time();
 		
 		uint16_t buttons = button_manager.read_buttons();
 		
@@ -559,4 +551,5 @@ int main() {
 			}
 		}
 	}
+#pragma clang diagnostic pop
 }
