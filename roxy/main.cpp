@@ -257,8 +257,9 @@ int main() {
 #endif
 
 #if defined(ROXY)
-	// Get board version
-	board_version.get_version();
+	// // Get board version
+	// board_version.get_version();	// 2023-03-05 All released boards are v1.1 and this is not reliable
+	board_version.board = Board_Version::V1_1;
 	// Set pins based on version
 	if(board_version.board == Board_Version::V1_1) {
 		current_pins = &roxy_v11_pins;
