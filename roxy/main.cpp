@@ -471,6 +471,12 @@ int main() {
 		
 		input_report_t report = {1, buttons, uint8_t(axis[0]->count), uint8_t(axis[1]->count)};
 
+		// Disable X/Y reports if the config option is set
+		if(config.flags & (1 << 9)) {
+			report.axis_x = 0;
+			report.axis_y = 0;
+		}
+
 		// PS2 (if enabled)
 		if(config.ps2_mode > 0) {
 			spi_ps.set_buttons(buttons);
